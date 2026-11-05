@@ -203,11 +203,18 @@ export const useWorkflowStore = defineStore('workflow', () => {
   }
 
   function resume() {
-    if (!run.value || run.value.status !== 'paused') return;
-    run.value.status = 'running';
-    run.value.message = undefined;
-    pauseGate?.();
-    pauseGate = null;
+    const r = run.value;
+    if (!r || r.status !== 'paused') return;
+    r.status = 'running';
+    r.message = undefined;
+    if (pauseGate) {
+      pauseGate();
+      pauseGate = null;
+    } else {
+      // 回退、被中断这类情况没有活着的循环，需要重新拉起
+      cancelled = false;
+      void loop();
+    }
     void persist();
   }
 
@@ -250,6 +257,100 @@ export const useWorkflowStore = defineStore('workflow', () => {
     cancelled = false;
     await persist();
     void loop();
+  }
+
+  /**
+   * 回退：删掉这一步及之后所有步骤的产物，从这个位置重新开始。
+   *
+   * 只删「这一步产生的、能对应到磁盘上的东西」：
+   * 写作类 → 清空对应报告正文并退回「未开始」；记录起草 → 该学期记录清回空白占位（篇数不变）；
+   * 其余步骤（检索、分工、审核、确认门）在磁盘上没有产物，只把状态与输出清掉。
+   */
+  async function rollback(index: number): Promise<boolean> {
+    const r = run.value;
+    if (!r) return false;
+    if (busy.value) {
+      app.toast('还在跑，先暂停或取消再回退', 'warn');
+      return false;
+    }
+    if (index < 0 || index >= r.steps.length) return false;
+
+    const steps = r.steps;
+    const target = steps[index];
+    const affected = steps.slice(index);
+    const affectedIds = new Set(affected.map((x) => x.id));
+    const defs = def.value.steps;
+    const defOf = (id: string) => defs.find((x) => x.id === id);
+
+    // 报告正文：只清「写作类」步骤对应的报告，审核类不动
+    const kinds = new Set<ReportKind>();
+    for (const x of affected) {
+      const d = defOf(x.id);
+      if (d?.report && d.id.endsWith('-write')) kinds.add(d.report);
+    }
+    for (const kind of kinds) {
+      const rep = projects.reports.find((x) => x.kind === kind);
+      if (!rep) continue;
+      for (const sec of rep.sections) {
+        if (NON_AI_SECTIONS.includes(sec.heading)) continue;
+        sec.body = '';
+      }
+      rep.status = 'not-started';
+      rep.version = (rep.version ?? 1) + 1;
+      await projects.saveReport(rep);
+    }
+
+    // 过程记录：清回空白占位，篇数与编号保留
+    const clearedTerms = new Set<Term>();
+    for (const x of affected) {
+      const d = defOf(x.id);
+      if (d?.kind !== 'records' || !d.term || clearedTerms.has(d.term)) continue;
+      clearedTerms.add(d.term);
+      for (const rec of termRecords(d.term)) {
+        rec.stageName = '';
+        rec.activityName = '';
+        rec.startDate = '';
+        rec.endDate = '';
+        rec.place = '';
+        rec.participants = [];
+        rec.goal = '';
+        rec.work = '';
+        rec.materials = '';
+        rec.outputs = '';
+        rec.summary = '';
+        rec.nextPlan = '';
+        rec.confirmed = false;
+        rec.updatedAt = Date.now();
+        await db.records.put(JSON.parse(JSON.stringify(rec)));
+      }
+    }
+
+    // 状态复位：这一步及之后全部回到「等待」
+    for (const x of affected) {
+      x.status = 'pending';
+      x.output = '';
+      x.error = undefined;
+      x.warnings = [];
+      x.calls = 0;
+      x.cost = 0;
+      x.hits = 0;
+      x.startedAt = undefined;
+      x.endedAt = undefined;
+      x.edited = false;
+    }
+    r.activities = (r.activities ?? []).filter((a) => !affectedIds.has(a.stepId));
+    r.current = index;
+    r.status = 'paused';
+    r.endedAt = undefined;
+    r.message =
+      `已回退到第 ${index + 1} 步「${target.name}」：这一步及之后生成的` +
+      `${kinds.size ? '报告正文' : clearedTerms.size ? '记录草稿' : '过程'}已删除` +
+      `${kinds.size && clearedTerms.size ? '与记录草稿' : ''}。点「继续」从这里重新跑。`;
+    await persist();
+
+    const names = affected.slice(0, 6).map((x) => x.name).join('、');
+    app.toast(`已回退 ${affected.length} 步：${names}${affected.length > 6 ? ' 等' : ''}`, 'info', 4200);
+    return true;
   }
 
   /** 用户点「确认」/「跳过」 */
@@ -576,26 +677,36 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
     const target =
       term === 1 ? Math.max(0, p.recordPlan?.firstTerm ?? 0) : Math.max(0, p.recordPlan?.secondTerm ?? 0);
-    const existing = projects.records.filter((x) => x.term === term);
-    const need = Math.max(0, target - existing.length);
-    if (!need) {
+
+    // 项目创建时已经建好空白占位记录：这一步填的是这些占位，不是再新增一批
+    let termRecs = termRecords(term);
+    while (termRecs.length < target) {
+      const rec = blankRecord(p.id, term, termRecs.length + 1);
+      await db.records.put(rec);
+      projects.records.push(rec);
+      termRecs = termRecords(term);
+    }
+
+    const blanks = termRecs.filter(isBlankRecord);
+    if (!blanks.length) {
       step.status = 'done';
-      step.output = `${termName(term)}已经有 ${existing.length} 篇记录，这次没有新增。要重写请到「过程记录」里改。`;
+      step.output = `${termName(term)}的 ${termRecs.length} 篇记录都已有内容，这次没有改写。要重写请到「过程记录」里改。`;
       return;
     }
 
     let made = 0;
     let lastErr = '';
     let dry = 0;
+    const total = blanks.length;
 
-    while (made < need) {
+    while (made < total) {
       if (cancelled) break;
       const leftCalls = r.maxCalls - r.calls - step.calls;
       if (leftCalls <= 0) break;
-      const n = batchCount(need - made, leftCalls);
+      const n = batchCount(total - made, leftCalls);
       if (n <= 0) break;
 
-      const from = existing.length + made;
+      const from = blanks[made].index - 1;
       act(step.id, `${termName(term)}第 ${from + 1}–${from + n} 篇`, 'running', '正在写这一批…');
 
       let drafts: DraftRecord[] = [];
@@ -613,13 +724,13 @@ export const useWorkflowStore = defineStore('workflow', () => {
       }
       dry = 0;
 
-      for (const d of drafts.slice(0, need - made)) {
-        const rec = toRecord(p.id, term, existing.length + made + 1, d);
-        await db.records.put(rec);
-        projects.records.push(rec);
+      for (const d of drafts.slice(0, total - made)) {
+        const rec = blanks[made];
+        fillRecord(rec, d);
+        await db.records.put(JSON.parse(JSON.stringify(rec)));
         made += 1;
       }
-      act(step.id, `已写入第 ${existing.length + made} 篇`, 'done', `本批 ${drafts.length} 篇`);
+      act(step.id, `已写入第 ${blanks[made - 1].index} 篇`, 'done', `本批 ${Math.min(drafts.length, total)} 篇`);
       await persist();
     }
 
@@ -632,16 +743,20 @@ export const useWorkflowStore = defineStore('workflow', () => {
       return;
     }
 
-    const rest = need - made;
+    const rest = total - made;
     step.status = 'done';
     step.output =
-      `${termName(term)}已起草 ${made} 篇（第 ${existing.length + 1}–${existing.length + made} 篇），共 ${target} 篇。` +
-      (rest > 0 ? `还差 ${rest} 篇：到调用上限了，点「继续」再跑一次会接着写，已写好的不会重复。` : '') +
+      `${termName(term)}填好了 ${made} 篇草稿（本批共 ${total} 篇空缺，总计 ${target} 篇）。` +
+      (rest > 0 ? `还差 ${rest} 篇：到调用上限了，点「继续」再跑一次会接着填，已填好的不会重复。` : '') +
       '\n这些是「按计划该做的事」，不是已经发生的记录：逐篇改成真实时间、真实参与人、真实做法，再点确认。';
     step.warnings = [
       `草稿 ${made} 篇均为未确认状态，未经你核对不能当作真实记录导出。`,
-      ...(rest > 0 ? [`还有 ${rest} 篇没起草，下次继续。`] : []),
+      ...(rest > 0 ? [`还有 ${rest} 篇没填，下次继续。`] : []),
     ];
+  }
+
+  function termRecords(term: Term): StudyRecord[] {
+    return projects.records.filter((x) => x.term === term).sort((a, b) => a.index - b.index);
   }
 
   async function draftBatch(p: NonNullable<typeof projects.current>, term: Term, n: number, from: number) {
@@ -667,33 +782,55 @@ export const useWorkflowStore = defineStore('workflow', () => {
     return parseDrafts(res.text, n);
   }
 
-  /** 草稿 → 记录：一律未确认，正文写清这是待核对的计划动作 */
-  function toRecord(projectId: string, term: Term, index: number, d: DraftRecord): StudyRecord {
+  function blankRecord(projectId: string, term: Term, index: number): StudyRecord {
     return {
       id: uid('rec'),
       projectId,
       index,
       term,
-      stageName: d.stageName,
-      activityName: d.activityName,
-      startDate: d.startDate,
-      endDate: d.endDate,
-      place: d.place,
-      participants: d.participants,
+      stageName: '',
+      activityName: '',
+      startDate: '',
+      endDate: '',
+      place: '',
+      participants: [],
       recorder: '',
       recordedAt: todayISO(),
-      goal: d.goal,
-      work: d.work,
-      materials: d.materials,
-      outputs: d.outputs,
-      summary: d.summary,
-      nextPlan: d.nextPlan,
+      goal: '',
+      work: '',
+      materials: '',
+      outputs: '',
+      summary: '',
+      nextPlan: '',
       attachments: [],
       activityIds: [],
       sourceType: 'real',
       confirmed: false,
       updatedAt: Date.now(),
     };
+  }
+
+  /** 一篇空白占位：没有活动名、也没写做法 */
+  function isBlankRecord(r: StudyRecord): boolean {
+    return !r.activityName.trim() && !r.work.trim() && !r.goal.trim() && !r.summary.trim();
+  }
+
+  /** 草稿写进占位：保留 id / index / term，一律未确认 */
+  function fillRecord(rec: StudyRecord, d: DraftRecord): void {
+    rec.stageName = d.stageName;
+    rec.activityName = d.activityName;
+    rec.startDate = d.startDate;
+    rec.endDate = d.endDate;
+    rec.place = d.place;
+    rec.participants = d.participants;
+    rec.goal = d.goal;
+    rec.work = d.work;
+    rec.materials = d.materials;
+    rec.outputs = d.outputs;
+    rec.summary = d.summary;
+    rec.nextPlan = d.nextPlan;
+    rec.confirmed = false;
+    rec.updatedAt = Date.now();
   }
 
   async function runAgentOnce(step: WorkflowRunStep, sdef: WorkflowStepDef, r: WorkflowRun) {
@@ -999,6 +1136,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     cancel,
     retry,
     confirmStep,
+    rollback,
     regenerateStep,
     editStepOutput,
     exportFinal,

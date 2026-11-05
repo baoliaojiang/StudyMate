@@ -13,6 +13,7 @@ import { useAppStore } from '../../stores/app';
 import { SCOPES } from './scopes';
 import type { WorkflowActivity, WorkflowScope, WorkflowStepStatus } from '../../core/types';
 import MarkdownText from '../MarkdownText.vue';
+import { askConfirm } from '../../core/task-guard';
 
 const props = defineProps<{ initialScope?: WorkflowScope }>();
 const emit = defineEmits<{ (e: 'close'): void; (e: 'goto', tab: 'sources' | 'records' | 'members'): void }>();
@@ -87,6 +88,7 @@ const currentElapsed = computed(() => {
 interface LiveGroup {
   key: string;
   title: string;
+  note: string;
   current: boolean;
   items: WorkflowActivity[];
 }
@@ -104,15 +106,21 @@ const liveGroups = computed<LiveGroup[]>(() => {
   }
   const curId = currentStep.value?.id;
   const stillRunning = ['running', 'awaiting', 'paused'].includes(r.status);
+  const nameOf = (id: string) => r.steps.find((x) => x.id === id)?.name ?? '过程';
   return [...buckets.entries()].map(([key, items]) => {
     const current = stillRunning && key === curId;
+    // 同一标签重复出现（重试、回退后重跑）只留最后一条，避免堆成一串同名行
+    const lastAt = new Map<string, number>();
+    items.forEach((a, i) => lastAt.set(`${a.label}|${a.status}`, i));
+    const dedup = items.filter((a, i) => lastAt.get(`${a.label}|${a.status}`) === i);
+    const done = dedup.filter((a) => a.status === 'done').length;
+    const all = dedup.length;
     return {
       key,
-      items,
+      items: dedup,
       current,
-      title: current
-        ? '进行中'
-        : `已完成 ${items.filter((a) => a.status === 'done').length} 个步骤`,
+      title: `${current ? '进行中 · ' : ''}${nameOf(key)}`,
+      note: all > done ? `${done}/${all} 条完成` : `${all} 条过程`,
     };
   });
 });
@@ -142,6 +150,43 @@ const nowText = computed(() => {
 
 async function startRun() {
   await wf.start(scope.value);
+}
+
+/** 回退：删掉这一步及之后所有步骤的产物，说清删什么再动手 */
+async function rollbackTo(i: number) {
+  const r = run.value;
+  const s = r?.steps[i];
+  if (!r || !s) return;
+  const later = r.steps.length - i;
+  const kinds = new Set(
+    r.steps
+      .slice(i)
+      .map((x) => x.report)
+      .filter(Boolean) as string[],
+  );
+  const terms = new Set(
+    r.steps
+      .slice(i)
+      .filter((x) => x.id.startsWith('records-draft'))
+      .map((x) => (x.id.endsWith('t2') ? '下学期' : '上学期')),
+  );
+  const what = [
+    kinds.size ? `${[...kinds].map((k) => ({ proposal: '开题', midterm: '中期', final: '结题' }[k] ?? k)).join('、')}报告的正文` : '',
+    terms.size ? `${[...terms].join('、')}的过程记录草稿` : '',
+  ].filter(Boolean);
+
+  const ok = await askConfirm({
+    title: `回退到第 ${i + 1} 步「${s.name}」`,
+    message:
+      `第 ${i + 1} 步到第 ${r.steps.length} 步（共 ${later} 步）都会回到「等待」，` +
+      (what.length ? `同时删除${what.join('和')}。` : '这一步没有可删的文件产物。') +
+      '\n删除不可恢复；已确认的报告也会退回「未开始」，需要重新生成或自己补写。',
+    confirmText: '删除产物并回退',
+    cancelText: '不回退',
+    tone: 'warn',
+  });
+  if (!ok) return;
+  await wf.rollback(i);
 }
 
 async function confirmCurrent() {
@@ -286,6 +331,7 @@ const pct = computed(() => wf.progress);
             <button class="live-head" type="button" @click="toggleGroup(g.key)">
               <span class="live-spark" :class="{ spinning: g.current }">✳</span>
               <b>{{ g.title }}</b>
+              <span class="live-note">{{ g.note }}</span>
               <span class="live-chev" :class="{ shut: collapsed[g.key] }">⌄</span>
             </button>
             <div class="live-fold" :class="{ open: !collapsed[g.key] }">
@@ -391,6 +437,14 @@ const pct = computed(() => wf.progress);
               </ul>
               <div class="step-actions">
                 <button v-if="canRun(s) && !active" class="btn btn-sm" type="button" @click="wf.retry(i)">只重跑这一步</button>
+                <button
+                  v-if="s.status !== 'pending' && !active"
+                  class="btn btn-sm"
+                  type="button"
+                  @click="rollbackTo(i)"
+                >
+                  回退到这一步
+                </button>
                 <button v-if="s.id === 'confirm-sources'" class="btn btn-sm" type="button" @click="emit('goto', 'sources')">去来源页确认</button>
                 <button v-if="s.id === 'records-guard'" class="btn btn-sm" type="button" @click="emit('goto', 'records')">去写研究记录</button>
                 <button v-if="s.id === 'assign'" class="btn btn-sm" type="button" @click="emit('goto', 'members')">去分工</button>
@@ -470,6 +524,7 @@ const pct = computed(() => wf.progress);
 .live-head b { font-weight: var(--fw-medium); }
 .live-spark { color: var(--text-3); font-size: 13px; line-height: 1; }
 .live-spark.spinning { color: var(--primary); animation: spin 3.2s linear infinite; }
+.live-note { font-size: 11px; color: var(--text-3); margin-left: 6px; font-variant-numeric: tabular-nums; }
 .live-chev { margin-left: auto; color: var(--text-3); transition: transform 240ms var(--ease-out); }
 .live-chev.shut { transform: rotate(-90deg); }
 .live-fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 260ms var(--ease-out); }

@@ -14,7 +14,7 @@
 export const SITE = {
   appName: '研学帮 StudyMate',
   /** 当前版本，需与 package.json 保持一致 */
-  version: '1.0.14',
+  version: '1.0.15',
 
   /** 作者主页（已填） */
   authorHome: 'https://github.com/baoliaojiang',

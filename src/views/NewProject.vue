@@ -132,7 +132,7 @@ function parseIdeas(raw: string): { topic: string; why: string }[] {
 
 async function suggestIdeas() {
   if (!aiReady.value) {
-    ideaErr.value = '还没有可用的模型。到 设置 → 模型服务 接一个就能用。';
+    ideaErr.value = '还没有可用的模型。到 设置 → 模型与检索 → API 管理中心 接一个就能用。';
     return;
   }
   if (ideaBusy.value) return;
@@ -548,7 +548,7 @@ async function create() {
         <template v-else>
           「离线规则识别」只是按关键词匹配学校和篇数，<b>不是 AI</b>。
           想用 AI 分析，先到
-          <router-link to="/settings">设置 → 模型服务</router-link>
+          <router-link to="/settings">设置 → 模型与检索 → API 管理中心</router-link>
           配置一个 API。
         </template>
       </p>

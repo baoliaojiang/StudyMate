@@ -10,6 +10,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import AppAvatar from '../components/AppAvatar.vue';
+import { askConfirm } from '../core/task-guard';
 import SettingGroup from '../components/settings/SettingGroup.vue';
 import SettingRow from '../components/settings/SettingRow.vue';
 import AccountPanel from './settings/AccountPanel.vue';
@@ -209,13 +210,33 @@ async function setAiMode(m: 'assist' | 'lead') {
 /** 缺材料时：留白待补充（默认）与写满再核对。写满要带免责声明 */
 async function setGapMode(m: 'strict' | 'fill') {
   if (m === 'fill' && s.value.gapMode !== 'fill') {
-    const ok = confirm(
-      '关闭留白后，AI 会把缺材料的章节尽量写满：推断处标「需核实」，具体数据仍留横线，结尾附免责声明。\n\n提交前必须逐条核对，不能直接交。继续？',
-    );
+    const ok = await askConfirm({
+      title: '改成「写满再核对」？',
+      message:
+        '关了留白之后，AI 会把缺材料的章节尽量写满：推断处标「需核实」，具体数据仍留横线，结尾附免责声明。提交前必须逐条核对，不能直接交。',
+      confirmText: '改成写满',
+      cancelText: '保持留白',
+      tone: 'warn',
+    });
     if (!ok) return;
     app.toast('已切换为写满模式：生成内容需逐条核对后再提交。', 'warn', 4200);
   }
   await app.saveSettings({ gapMode: m });
+}
+const FONT_STEPS = [
+  { v: 0.9, label: '小' },
+  { v: 1, label: '标准' },
+  { v: 1.1, label: '大' },
+  { v: 1.2, label: '特大' },
+];
+async function setFontScale(v: number) {
+  await app.saveSettings({ fontScale: v });
+}
+async function setTyping(k: 'fast' | 'normal' | 'slow') {
+  await app.saveSettings({ typingSpeed: k });
+}
+async function toggleThinking(on: boolean) {
+  await app.saveSettings({ thinking: on });
 }
 async function toggleMemory(on: boolean) {
   await app.setFeatures({ memory: on });
@@ -428,6 +449,24 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
           </div>
           <div class="inline">
             <div class="inline-label">
+              字号
+              <span class="inline-hint">全站文字大小</span>
+            </div>
+            <div class="seg">
+              <button
+                v-for="f in FONT_STEPS"
+                :key="f.v"
+                class="seg-item"
+                :class="{ on: Math.abs((s.fontScale ?? 1) - f.v) < 0.01 }"
+                type="button"
+                @click="setFontScale(f.v)"
+              >
+                {{ f.label }}
+              </button>
+            </div>
+          </div>
+          <div class="inline">
+            <div class="inline-label">
               界面动效
               <span class="inline-hint">页面与抽屉过渡</span>
             </div>
@@ -492,7 +531,7 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
           <SettingRow label="API 管理中心" :value="s.currentModel?.model || '未接入'" chevron @click="go('model')">
             <template #icon><AppIcon name="chip" /></template>
           </SettingRow>
-          <SettingRow label="检索服务" :value="`${searchEnabled} 个启用`" chevron @click="go('search')">
+          <SettingRow label="检索与来源" :value="`${searchEnabled} 个启用`" note="检索服务与学术来源" chevron @click="go('search')">
             <template #icon><AppIcon name="search" /></template>
           </SettingRow>
           <SettingRow label="免费 API 指引" note="官网、额度、取 Key 与配置示例" chevron @click="go('catalog')">
@@ -547,7 +586,7 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
           <div class="inline">
             <div class="inline-label">
               缺材料时
-              <span class="inline-hint">写满的内容会标注需核实，并附免责声明</span>
+              <span class="inline-hint">留白 = 允许「待补充」空着，不编数据；写满的内容会标注需核实</span>
             </div>
             <div class="seg">
               <button class="seg-item" :class="{ on: s.gapMode === 'strict' }" type="button" @click="setGapMode('strict')">
@@ -557,6 +596,27 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
                 写满再核对
               </button>
             </div>
+          </div>
+          <div class="inline">
+            <div class="inline-label">
+              打字流速度
+              <span class="inline-hint">适中约等于正常阅读速度</span>
+            </div>
+            <div class="seg">
+              <button class="seg-item" :class="{ on: (s.typingSpeed ?? 'normal') === 'fast' }" type="button" @click="setTyping('fast')">快速</button>
+              <button class="seg-item" :class="{ on: (s.typingSpeed ?? 'normal') === 'normal' }" type="button" @click="setTyping('normal')">适中</button>
+              <button class="seg-item" :class="{ on: (s.typingSpeed ?? 'normal') === 'slow' }" type="button" @click="setTyping('slow')">较慢</button>
+            </div>
+          </div>
+          <div class="inline">
+            <div class="inline-label">
+              深度思考
+              <span class="inline-hint">只对支持思考的模型生效，会展示思考过程</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" :checked="s.thinking === true" @change="toggleThinking(($event.target as HTMLInputElement).checked)" />
+              <span />
+            </label>
           </div>
           <SettingRow label="常用语" :value="`${s.phrases.length} 条`" chevron @click="go('phrases')">
             <template #icon><AppIcon name="phrases" /></template>
@@ -590,7 +650,7 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
         </SettingGroup>
 
         <p class="ver-line">
-          研学帮 StudyMate v{{ SITE.version }} · MIT License<br />
+          研学帮 StudyMate v{{ SITE.version }} · 使用许可<br />
           个人开发的第三方工具，与学校及其管理部门无隶属、授权、合作或背书关系。
         </p>
       </div>

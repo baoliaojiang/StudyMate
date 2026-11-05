@@ -114,7 +114,7 @@ async function generate() {
     const runtime = new AgentRuntime(app.gateway, await listSkills());
     const enabled = app.settings.enabledAgents ?? [];
     if (enabled.length && !enabled.includes('slide-writer')) {
-      app.toast('演示助手在设置里被关掉了，这次会用模板；到「设置 → 技能与助手」打开后可用 AI', 'info', 5200);
+      app.toast('演示助手在设置里被关掉了，这次会用模板；到「设置 → 其他设置 → 开发者选项」打开后可用 AI', 'info', 5200);
     }
     const base = deck.value ? (JSON.parse(JSON.stringify(deck.value)) as Deck) : undefined;
     const res = await generateDeck({

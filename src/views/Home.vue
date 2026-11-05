@@ -267,7 +267,7 @@ const NO_AI_REPLY = [
   '',
   '### 三步接上模型',
   '',
-  '1. 打开 **设置 → 模型服务**（这里也能直接进入 **API 管理中心**）。',
+  '1. 打开 **设置 → 模型与检索 → API 管理中心**（这里也能直接进入 **API 管理中心**）。',
   '2. 选一个服务商预设，粘贴它的 API Key，点 **拉取模型**——拉到列表后勾选要用的模型。',
   '3. 回到本页，右上角的胶囊会显示模型名，说明接通了。',
   '',
@@ -457,7 +457,7 @@ async function send(text?: string, entryKey?: keyof typeof MODE_ENTRY) {
     const onAgents = app.settings.enabledAgents ?? [];
     const plan = wanted.filter((id) => !onAgents.length || onAgents.includes(id));
     if (!plan.length) {
-      holder.text = '这一步要用的助手都被关掉了。到「设置 → 其他设置 → 技能与助手」里重新打开。';
+      holder.text = '这一步要用的助手都被关掉了。到「设置 → 其他设置 → 其他设置 → 开发者选项」里重新打开。';
       holder.error = true;
       streamingId.value = null;
       chat.commitCurrent();

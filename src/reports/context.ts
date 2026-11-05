@@ -144,7 +144,7 @@ export function gapsFor(kind: ReportKind, ctx: ReportContext, mode: GapMode = 's
     gaps.push({
       level: 'warn',
       text: '补全模式已开启：缺失处会由 AI 推断写满，提交前必须逐条核对',
-      where: '设置 → 个性化 → 允许「待补充」留白',
+      where: '设置 → 个性化 → 缺材料时（留白待补充）',
     });
   }
 
