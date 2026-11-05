@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-electron/
 dist-android/
+dist-pages/
 dist-ssr/
 release*/
 *.local
@@ -14,6 +15,7 @@ coverage/
 .workbuddy/
 .tmp-profile/
 .tmp-*/
+.deploy/
 
 # 本机构建产物与凭据：不进仓库
 android/app/build/

@@ -18,6 +18,7 @@
     "build:web": "vite build",
     "build:electron": "cross-env BUILD_TARGET=electron vite build --outDir dist-electron",
     "build:android": "cross-env BUILD_TARGET=android vite build --outDir dist-android",
+    "build:pages": "cross-env BUILD_TARGET=pages vite build --outDir dist-pages",
     "electron:dev": "cross-env STUDYMATE_DEV=1 vite build --outDir dist-electron && electron .",
     "electron:build": "npm run build:electron && electron-builder --win"
   },

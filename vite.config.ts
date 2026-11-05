@@ -11,13 +11,15 @@ const isElectron = process.env.BUILD_TARGET === 'electron';
  * 表现就是「重新打包了，功能还是点不动」。
  */
 const isAndroid = process.env.BUILD_TARGET === 'android';
+/** 在线版（GitHub Pages 项目站点）：用相对基路径适配 /StudyMate/ 子路径，关闭 Service Worker */
+const isPages = process.env.BUILD_TARGET === 'pages';
 
 export default defineConfig({
-  base: isElectron ? './' : '/',
+  base: isElectron || isPages ? './' : '/',
   plugins: [
     vue(),
     VitePWA({
-      disable: isElectron || isAndroid,
+      disable: isElectron || isAndroid || isPages,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-192.png', 'apple-touch-icon.png'],
       manifest: {
@@ -48,7 +50,13 @@ export default defineConfig({
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 1200,
-    outDir: isElectron ? 'dist-electron' : isAndroid ? 'dist-android' : 'dist',
+    outDir: isElectron
+      ? 'dist-electron'
+      : isAndroid
+        ? 'dist-android'
+        : isPages
+          ? 'dist-pages'
+          : 'dist',
   },
   server: { port: 5173, host: true },
   test: {
