@@ -28,11 +28,11 @@
 | 形态 | 地址 / 文件 | 说明 |
 | --- | --- | --- |
 | 在线版 | <https://baoliaojiang.github.io/StudyMate/> | 免安装，打开即用；数据存在当前浏览器 |
-| Windows | `研学帮-StudyMate-1.0.11-setup.exe` / `-portable.exe` | 安装版可选目录，便携版双击即用 |
-| Android | `app-release-1.0.11.apk` | 自签名 Release 包 |
+| Windows | `StudyMate-1.0.11-setup.exe` / `StudyMate-1.0.11-portable.exe` | 安装版可选目录，便携版双击即用 |
+| Android | `StudyMate-1.0.11-release.apk` | 自签名 Release 包 |
 | 源码 | 本仓库 `main` 分支 | 自行构建，见下方 |
 
-安装包与 APK 都放在 [Releases](https://github.com/baoliaojiang/StudyMate/releases)。Windows 未做代码签名，首次运行 SmartScreen 会提示「未知发布者」；Android 为自签名包，安装时系统也会给出提示。
+安装包与 APK 都放在 [Releases](https://github.com/baoliaojiang/StudyMate/releases)。应用内「设置 → 检查更新 / 关于」也直接放了本仓库、Releases 与 Issues 入口。Windows 未做代码签名，首次运行 SmartScreen 会提示「未知发布者」；Android 为自签名包，安装时系统也会给出提示。
 
 > 在线版使用 hash 路由，静态托管即可。浏览器本地数据与桌面版、安卓版互相独立，不自动同步。
 
