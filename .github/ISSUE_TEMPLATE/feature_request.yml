@@ -1,0 +1,26 @@
+name: 功能建议
+description: 提出一个新功能或改进
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到什么问题
+      description: 说场景，不要说「加个 AI 优化」
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望怎么做
+    validations:
+      required: true
+  - type: checkboxes
+    id: redline
+    attributes:
+      label: 红线自检
+      options:
+        - label: 这个功能不会帮助伪造研究数据或研究活动
+          required: true
+        - label: 这个功能不会引入未经告知的遥测
+          required: true

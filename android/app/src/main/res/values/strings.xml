@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">研学帮</string>
+    <string name="title_activity_main">研学帮</string>
+    <string name="package_name">app.studymate.study</string>
+    <string name="custom_url_scheme">app.studymate.study</string>
+</resources>

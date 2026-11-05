@@ -1,0 +1,23 @@
+{
+  "appId": "app.studymate.study",
+  "appName": "研学帮",
+  "webDir": "dist-android",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0b0b0f",
+    "compileSdkVersion": 36,
+    "targetSdkVersion": 36,
+    "minSdkVersion": 23,
+    "buildToolsVersion": "36.0.0"
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "_note": "已接入：npx cap sync android 后，在 android/ 目录 ./gradlew assembleDebug 出 Debug APK（产物 android/app/build/outputs/apk/debug/）。本机 SDK 位于 D://android-sdk（compileSdk/targetSdk 36）。本机代理会拦 TLS，构建需设 GRADLE_OPTS 走本地代理并信任 Windows 根证书；Gradle 分发包已缓存在 D:/gradle-dist，wrapper 指向 file:// 本地副本。 已启用 CapacitorHttp（原生网络栈，绕开 WebView 的 CORS/明文限制）与 allowMixedContent。",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

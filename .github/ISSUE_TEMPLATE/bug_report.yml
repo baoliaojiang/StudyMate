@@ -1,0 +1,51 @@
+name: 问题反馈
+description: 报告一个缺陷
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先确认：你用的是哪个版本？能否稳定复现？
+        **不要粘贴 API Key、真实姓名、学校内部资料。**
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options: [Web / PWA, Android, Windows, 其他]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 新建项目
+        2. 点 XXX
+        3. 出现 YYY
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      description: 有截图更好；错误提示请脱敏后粘贴
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      placeholder: Windows 11 / Edge 140 / Node 22

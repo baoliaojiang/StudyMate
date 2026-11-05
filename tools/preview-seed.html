@@ -1,0 +1,179 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>seed</title>
+<pre id="out">seeding…</pre>
+<script>
+  // 仅用于本地截图核验：建库（含索引）+ 写入「已接受声明」+ 一个示例项目
+  // 不属于应用产物，dist 里也不该长期存在
+  const SCHEMA = {
+    projects: 'id, updatedAt, status',
+    reports: 'id, projectId, kind, status',
+    records: 'id, projectId, term, index',
+    activities: 'id, projectId, stageId, sourceType',
+    datasets: 'id, projectId',
+    sources: 'id, projectId, verifyStatus, sourceType',
+    providers: 'id, kind',
+    settings: 'id',
+    usage: '++id, at, providerId, agentId',
+  };
+  const req = indexedDB.open('studymate', 2);
+  req.onupgradeneeded = () => {
+    const d = req.result;
+    for (const [name, spec] of Object.entries(SCHEMA)) {
+      const [keyPath, ...idx] = spec.split(',').map((s) => s.trim());
+      const kp = keyPath.startsWith('++')
+        ? { keyPath: keyPath.slice(2), autoIncrement: true }
+        : { keyPath };
+      const store = d.objectStoreNames.contains(name)
+        ? req.transaction.objectStore(name)
+        : d.createObjectStore(name, kp);
+      idx.forEach((i) => {
+        if (!store.indexNames.contains(i)) store.createIndex(i, i);
+      });
+    }
+  };
+
+  const params = new URLSearchParams(location.search);
+  const theme = params.get('theme') || 'light';
+  const font = params.get('font') || 'harmony';
+  const motion = params.get('motion') || 'on';
+
+  const now = Date.now();
+  const pid = 'prj-demo-1';
+
+  const project = {
+    id: pid,
+    createdAt: now - 86400000 * 6,
+    updatedAt: now - 3600000,
+    topic: '校园周边早餐摊的食品安全认知调查',
+    teacher: '林志强',
+    school: '福州鼓山中学',
+    grade: '高二',
+    className: '3 班',
+    groupName: '第三研究小组',
+    startDate: '2026-09-01',
+    endDate: '2027-06-20',
+    requirementText:
+      '本学期每班提交研究记录 15 篇（上学期 8 篇，下学期 7 篇）。开题报告 1 份、中期检查 1 份、结题报告 1 份。正文 3000 字以上，宋体小四，行距 1.5 倍。',
+    members: [
+      { id: 'm1', name: '邱奕宸', role: 'leader', duty: '总体统筹、问卷设计' },
+      { id: 'm2', name: '陈思远', role: 'member', duty: '实地观察与拍照记录' },
+      { id: 'm3', name: '林小满', role: 'member', duty: '数据整理与图表' },
+    ],
+    modes: ['practice', 'theory'],
+    aiMode: 'assist',
+    recordPlan: { total: 15, firstTerm: 8, secondTerm: 7 },
+    stageIndex: 1,
+    confirmations: [],
+    status: 'active',
+  };
+
+  const mkSections = (headings, filledCount, body) =>
+    headings.map((h, i) => ({
+      id: 's' + i,
+      heading: h,
+      level: 1,
+      body: i < filledCount ? body : '',
+      origin: i < filledCount ? 'user' : 'template',
+      updatedAt: now,
+    }));
+
+  const reports = [
+    {
+      id: 'rpt-1',
+      projectId: pid,
+      kind: 'proposal',
+      title: '课题开题（立项）报告',
+      sections: mkSections(
+        ['简要背景说明', '课题的目的和意义', '课题活动计划', '主导课程与相关课程', '指导教师意见'],
+        5,
+        '校园周边早餐摊是不少同学每天的第一顿饭来源，但配料、储存与操作卫生情况并不清楚。',
+      ),
+      version: 3,
+      updatedAt: now - 7200000,
+      status: 'confirmed',
+    },
+    {
+      id: 'rpt-2',
+      projectId: pid,
+      kind: 'midterm',
+      title: '课题中期检查报告',
+      sections: mkSections(
+        ['课题进展情况', '遇到的问题及对策', '成员的表现', '下一阶段要点'],
+        2,
+        '已完成 120 份问卷的发放与回收，正在进行数据录入与清洗。',
+      ),
+      version: 1,
+      updatedAt: now - 86400000,
+      status: 'draft',
+    },
+    {
+      id: 'rpt-3',
+      projectId: pid,
+      kind: 'final',
+      title: '研究性学习结题报告',
+      sections: mkSections(
+        ['课题提出的背景', '研究目标与内容', '研究方法与过程', '研究结果与分析', '结论与建议', '参考文献'],
+        0,
+        '',
+      ),
+      version: 1,
+      updatedAt: now - 86400000 * 3,
+      status: 'not-started',
+    },
+  ];
+
+  const records = [];
+  const firstTerm = 8;
+  for (let i = 1; i <= 15; i++) {
+    const done = i <= 3;
+    records.push({
+      id: 'rec-' + i,
+      projectId: pid,
+      index: i,
+      term: i <= firstTerm ? 1 : 2,
+      stageName: done ? ['资料准备', '问卷设计', '实地观察'][i - 1] : '',
+      startDate: done ? '2026-09-0' + i : '',
+      endDate: done ? '2026-09-1' + i : '',
+      recorder: done ? '邱奕宸' : '',
+      recordedAt: '2026-09-20',
+      goal: done ? '弄清早餐摊的证照与操作卫生现状' : '',
+      work: done ? '走访了校门口 6 个摊位，记录了操作台、储存方式与健康证公示情况。' : '',
+      outputs: done ? '形成 6 份观察记录表、43 张现场照片（已打码）。' : '',
+      summary: done ? '两家摊位存在生熟混放，健康证未公示。' : '',
+      nextPlan: done ? '下周完成问卷定稿并发放。' : '',
+      activityIds: [],
+      sourceType: 'real',
+      confirmed: done,
+      updatedAt: now,
+    });
+  }
+
+  req.onsuccess = () => {
+    const d = req.result;
+    const tx = d.transaction(['settings', 'projects', 'reports', 'records'], 'readwrite');
+    tx.objectStore('settings').put({
+      id: 'app',
+      disclaimerAccepted: true,
+      agreements: { privacy: true, terms: true, statement: true },
+      simulatedNoticeAccepted: true,
+      theme,
+      font,
+      motion,
+      devMode: false,
+      aiMode: 'assist',
+    });
+    tx.objectStore('projects').put(project);
+    reports.forEach((r) => tx.objectStore('reports').put(r));
+    records.forEach((r) => tx.objectStore('records').put(r));
+    tx.oncomplete = () => {
+      document.getElementById('out').textContent = 'ok';
+    };
+    tx.onerror = () => {
+      document.getElementById('out').textContent = 'tx error: ' + tx.error;
+    };
+  };
+  req.onerror = () => {
+    document.getElementById('out').textContent = 'error: ' + req.error;
+  };
+</script>

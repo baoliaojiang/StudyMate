@@ -1,0 +1,190 @@
+<script setup lang="ts">
+/** 个性化：记忆、会话设定、常用语 */
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { backOr } from '../../core/nav';
+import { useAppStore } from '../../stores/app';
+import { useProjectStore } from '../../stores/projects';
+import SettingGroup from '../../components/settings/SettingGroup.vue';
+import SettingRow from '../../components/settings/SettingRow.vue';
+import SubPage from '../../components/settings/SubPage.vue';
+
+const props = defineProps<{ kind: 'memory' | 'session' | 'phrases' }>();
+const app = useAppStore();
+const store = useProjectStore();
+const router = useRouter();
+
+/** 返回上一级：有历史原路返回，没有则回设置首页 */
+function back() {
+  backOr(router, '/settings');
+}
+
+const title = computed(
+  () => ({ memory: '记忆', session: '会话设定', phrases: '常用语' })[props.kind],
+);
+
+const newPhrase = ref('');
+
+/** 「记忆」= 本机数据里 AI 能读到的上下文，不是聊天记录上传 */
+const memoryItems = computed(() => [
+  { label: '称呼', value: app.displayName },
+  { label: '项目主题', value: store.list.map((p) => p.topic).filter(Boolean).slice(0, 4).join('、') || '暂无' },
+  { label: '成员与指导教师', value: store.current ? `${store.current.members.map((m) => m.name).join('、')} · ${store.current.teacher}` : '进入项目后才有' },
+  { label: '写作偏好', value: app.settings.font === 'harmony' ? '内置 HarmonyOS Sans' : '系统字体' },
+]);
+
+async function toggleMemory(on: boolean) {
+  await app.setFeatures({ memory: on });
+  app.toast(on ? 'AI 会参考项目上下文' : 'AI 不再读取项目上下文', 'info', 2200);
+}
+
+async function setMode(m: 'assist' | 'lead') {
+  await app.saveSettings({ aiMode: m });
+  app.toast(m === 'assist' ? '改为「AI 辅助」：先给提纲，由你确认' : '改为「AI 主导」：逐节生成，仍需你确认', 'info', 2400);
+}
+
+async function addPhrase() {
+  const v = newPhrase.value.trim();
+  if (!v) return;
+  if (app.settings.phrases.includes(v)) {
+    app.toast('这条已经存在', 'warn');
+    return;
+  }
+  await app.setPhrases([...app.settings.phrases, v]);
+  newPhrase.value = '';
+}
+
+async function removePhrase(i: number) {
+  const list = [...app.settings.phrases];
+  list.splice(i, 1);
+  await app.setPhrases(list);
+}
+</script>
+
+<template>
+  <SubPage :title="title" @back="back">
+    <!-- 记忆 -->
+    <template v-if="props.kind === 'memory'">
+      <SettingGroup>
+        <SettingRow
+          label="让 AI 参考项目记忆"
+          note="只读取本机已存在的主题、成员与已写内容，不上传聊天记录"
+          :value="app.settings.features.memory ? '开启' : '关闭'"
+        >
+          <template #right>
+            <label class="switch" @click.stop>
+              <input type="checkbox" :checked="app.settings.features.memory" @change="toggleMemory(($event.target as HTMLInputElement).checked)" />
+              <span />
+            </label>
+          </template>
+        </SettingRow>
+      </SettingGroup>
+
+      <SettingGroup title="现在记着什么">
+        <div class="mem">
+          <div v-for="m in memoryItems" :key="m.label" class="mem-row">
+            <span>{{ m.label }}</span>
+            <b>{{ m.value }}</b>
+          </div>
+        </div>
+      </SettingGroup>
+      <p class="note">
+        「记忆」是本机数据的投影，不是另一份副本。删除项目时，相关内容会一起消失，不存在“删了还偷偷留着”。
+      </p>
+    </template>
+
+    <!-- 会话设定 -->
+    <template v-else-if="props.kind === 'session'">
+      <SettingGroup title="AI 工作方式">
+        <SettingRow
+          label="AI 辅助"
+          note="先生成提纲与检查清单，正文由你确认后再写"
+          :value="app.settings.aiMode === 'assist' ? '已选' : ''"
+          chevron
+          @click="setMode('assist')"
+        />
+        <SettingRow
+          label="AI 主导"
+          note="逐节生成草稿，每一节都需要你点确认，AI 不会自己把报告标成已确认"
+          :value="app.settings.aiMode === 'lead' ? '已选' : ''"
+          chevron
+          @click="setMode('lead')"
+        />
+      </SettingGroup>
+
+      <SettingGroup title="模型分配">
+        <SettingRow
+          label="自动分配模型"
+          note="简单任务用便宜模型，复杂任务才用高性能模型"
+          :value="app.settings.autoAssign ? '开启' : '关闭'"
+        >
+          <template #right>
+            <label class="switch" @click.stop>
+              <input
+                type="checkbox"
+                :checked="app.settings.autoAssign"
+                @change="app.saveSettings({ autoAssign: ($event.target as HTMLInputElement).checked })"
+              />
+              <span />
+            </label>
+          </template>
+        </SettingRow>
+        <SettingRow label="模型与预算" value="在「模型服务」里调" chevron @click="router.push('/settings/model')" />
+      </SettingGroup>
+
+      <p class="note">
+        无论哪种方式，AI 都不会谎称研究已经真实开展；缺少真实材料时它会提问或标「待补充」。
+      </p>
+    </template>
+
+    <!-- 常用语 -->
+    <template v-else>
+      <SettingGroup title="新增常用语">
+        <div class="add">
+          <input v-model="newPhrase" class="input" maxlength="80" placeholder="比如：本阶段尚未开展，待补充。" @keyup.enter="addPhrase" />
+          <button class="btn btn-sm btn-primary" type="button" @click="addPhrase">添加</button>
+        </div>
+      </SettingGroup>
+
+      <SettingGroup title="已保存">
+        <div v-if="!app.settings.phrases.length" class="empty">还没有常用语。</div>
+        <div v-for="(p, i) in app.settings.phrases" :key="p + i" class="phrase">
+          <span>{{ p }}</span>
+          <button class="del" type="button" aria-label="删除" @click="removePhrase(i)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+      </SettingGroup>
+      <p class="note">常用语可以在研究记录的编辑框里一键插入，省得反复手打同一句说明。</p>
+    </template>
+  </SubPage>
+</template>
+
+<style scoped>
+.note { margin: 0 4px; font-size: 11.5px; line-height: 1.75; color: var(--text-3); }
+.mem { padding: 6px 14px 8px; }
+.mem-row { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.mem-row:last-child { border-bottom: none; }
+.mem-row span { color: var(--text-3); flex: 0 0 96px; }
+.mem-row b { flex: 1; font-weight: var(--fw-medium); word-break: break-word; }
+.add { display: flex; gap: 8px; padding: 14px; }
+.add .input { flex: 1; }
+.phrase {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; font-size: 13px; line-height: 1.6;
+}
+.phrase + .phrase { border-top: 1px solid var(--line); }
+.phrase span { flex: 1; }
+.del {
+  width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center;
+  border: none; border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer;
+}
+.del:hover { background: var(--surface-2); color: var(--danger, #c0392b); }
+.empty { padding: 22px 14px; text-align: center; font-size: 12.5px; color: var(--text-3); }
+.switch { position: relative; display: inline-block; width: 44px; height: 26px; flex: 0 0 44px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch span { position: absolute; inset: 0; background: var(--surface-3); border-radius: var(--r-full); transition: background var(--dur-2); cursor: pointer; }
+.switch span::after { content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: transform var(--dur-3) var(--ease-out); }
+.switch input:checked + span { background: var(--primary); }
+.switch input:checked + span::after { transform: translateX(18px); }
+</style>

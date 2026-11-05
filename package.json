@@ -1,0 +1,92 @@
+{
+  "name": "studymate",
+  "version": "1.0.11",
+  "private": false,
+  "description": "研学帮 StudyMate — AI 研究性学习助手（第三方开源软件）",
+  "license": "MIT",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "author": "研学帮 StudyMate",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "vue-tsc --noEmit",
+    "gen:logos": "node scripts/gen-brand-logos.mjs",
+    "build:web": "vite build",
+    "build:electron": "cross-env BUILD_TARGET=electron vite build --outDir dist-electron",
+    "build:android": "cross-env BUILD_TARGET=android vite build --outDir dist-android",
+    "electron:dev": "cross-env STUDYMATE_DEV=1 vite build --outDir dist-electron && electron .",
+    "electron:build": "npm run build:electron && electron-builder --win"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "dexie": "^4.0.10",
+    "docx": "^9.0.2",
+    "docx-preview": "^0.4.1",
+    "jszip": "^3.10.1",
+    "pinia": "^2.2.6",
+    "pptxgenjs": "^4.0.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
+    "simple-icons": "^16.36.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^0.21.1",
+    "vitest": "^2.1.8",
+    "vue-tsc": "^2.1.10"
+  },
+  "build": {
+    "appId": "app.studymate.study",
+    "productName": "研学帮 StudyMate",
+    "copyright": "Copyright © 2026 研学帮 StudyMate",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "研学帮-StudyMate-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "研学帮-StudyMate-${version}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "研学帮-StudyMate-${version}-portable.${ext}"
+    }
+  }
+}

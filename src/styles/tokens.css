@@ -1,0 +1,167 @@
+/* ============================================================
+   研学帮 StudyMate — Design Tokens v2
+   参考 1：Linear —— 借鉴「低对比 1px 描边 + 单一强调色 + 高密度但有秩序」
+   参考 2：Stripe —— 借鉴「表格即界面 + 右对齐等宽数字」
+   不借鉴：它们的版式结构、配色值、品牌图形
+
+   情绪词 → 参数映射
+   冷静 → 中性阶带 30° 暖色相、无渐变铺底、1px 描边
+   精密 → 8pt 网格、tabular-nums、圆角 ≤20
+   克制 → 主色面积 ≤10%、动效 ≤420ms、无装饰插画
+
+   硬规则：浅/深两套各自定义，正文对比度 ≥4.5:1
+   ============================================================ */
+
+:root {
+  /* ---------- 字体 ----------
+     正文一律用随包分发的 HarmonyOS Sans SC（见 fonts.css），
+     不依赖系统已安装字体，也不调用任何系统字体 API。
+     后面的系统字体只作为子集外生僻字的最后兜底。 */
+  --font-sans: 'HarmonyOS Sans SC', 'Harmony Sans SC', 'Source Han Sans SC',
+    'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --font-serif: 'HarmonyOS Sans SC', 'Source Han Serif SC', 'Songti SC', serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+
+  /* 字阶：比例 1.25，6 级 */
+  --fs-1: 12.5px; /* 元信息、单位 */
+  --fs-2: 15px; /* 正文 */
+  --fs-3: 17px; /* 卡片标题 */
+  --fs-4: 21px; /* 区块标题 */
+  --fs-5: 27px; /* 次级展示 */
+  --fs-6: 34px; /* 展示（一屏一处） */
+
+  --lh-1: 1.15; /* 展示 */
+  --lh-2: 1.35; /* 标题 */
+  --lh-3: 1.7; /* 正文 */
+
+  /* ---------- 间距（4/8 基准，禁表外值） ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* ---------- 圆角（4 档 + 胶囊） ----------
+     iOS 26/27 形状系统：控件一律胶囊（半径 = 高度/2），
+     容器用同心圆角 —— 子元素半径 ≈ 父容器半径 − 内边距。
+     澎湃 OS 4：全站统一曲率，不再出现 6/10/16 这类杂值。 */
+  --r-1: 14px; /* 输入框、次级控件 */
+  --r-2: 20px; /* 内嵌小块、分组列表 */
+  --r-3: 28px; /* 卡片、面板 */
+  --r-4: 36px; /* 弹层、抽屉、大容器 */
+  --r-full: 999px; /* 按钮、标签、头像、开关 */
+  /* 同心圆角：card 内边距 20 → 内部小块取 28-20 ≈ 8，视觉上与卡片曲率连续 */
+  --r-concentric-1: 10px;
+
+  /* ---------- 动效 ---------- */
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 240ms;
+  --dur-4: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --stagger: 60ms;
+
+  /* ---------- 字重（暗色自动减 40，防白字发胖） ---------- */
+  --fw-normal: 400;
+  --fw-medium: 520;
+  --fw-strong: 620;
+
+  /* ---------- 弹簧曲线 ----------
+     过阻尼：跟手、零回弹，用于抽屉/拖拽；
+     欠阻尼：微弹，用于对勾、点赞这类确认反馈。 */
+  --spring-over: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring-under: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --nav-h: 56px;
+  --maxw: 1200px;
+}
+
+/* ---------- 浅色：暖纸底 + 纯白卡 ---------- */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f5f5f3;
+  --bg-deep: #eeece8;
+  --surface: #fcfcfb;
+  --surface-2: #f2f1ee;
+  --surface-3: #e7e5e0;
+
+  --line: rgba(24, 22, 18, 0.09);
+  --line-strong: rgba(24, 22, 18, 0.18);
+
+  --text: #1a1a18;
+  --text-2: #4e4c47;
+  --text-3: #6d6a63;
+
+  --primary: #1f4fd8;
+  --on-primary: #ffffff;
+  --primary-soft: rgba(31, 79, 216, 0.09);
+
+  --ok: #2f6b57;
+  --warn: #8a5a00;
+  --danger: #a9502f;
+  --sim: #6b4fa8;
+
+  --shadow-1: 0 1px 2px rgba(24, 22, 18, 0.04), 0 1px 3px rgba(24, 22, 18, 0.06);
+  --shadow-2: 0 4px 10px -2px rgba(24, 22, 18, 0.06), 0 12px 24px -8px rgba(24, 22, 18, 0.1);
+  --shadow-3: 0 12px 32px -8px rgba(24, 22, 18, 0.14), 0 32px 64px -24px rgba(24, 22, 18, 0.16);
+
+  --glow: radial-gradient(60vw 40vh at 50% -5%, rgba(31, 79, 216, 0.1), transparent 70%);
+  --scrim: rgba(24, 22, 18, 0.42);
+}
+
+/* ---------- 深色：带色黑 + 提亮面 ---------- */
+[data-theme='dark'] {
+  color-scheme: dark;
+  /* 白字在深底上视觉膨胀约 40 单位，统一减重 */
+  --fw-normal: 360;
+  --fw-medium: 470;
+  --fw-strong: 560;
+
+  --bg: #0b0b0a;
+  --bg-deep: #080807;
+  --surface: #151515;
+  --surface-2: #1a1a19;
+  --surface-3: #20201e;
+
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.18);
+
+  --text: #eceae5;
+  --text-2: #aeaba4;
+  --text-3: #8a8780;
+
+  --primary: #3e6fe0;
+  --on-primary: #ffffff;
+  --primary-soft: rgba(110, 155, 255, 0.14);
+
+  --ok: #4d9b7f;
+  --warn: #c99b4a;
+  --danger: #d0704f;
+  --sim: #9b7fd4;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --shadow-3: 0 24px 56px -20px rgba(0, 0, 0, 0.7);
+
+  --glow: radial-gradient(60vw 40vh at 50% -5%, rgba(110, 155, 255, 0.12), transparent 70%);
+  --scrim: rgba(0, 0, 0, 0.6);
+}
+
+/* ------------------------------------------------------------------ */
+/* 字体切换                                                            */
+/* 默认（data-font="harmony" 或未设置）走内置 HarmonyOS Sans SC；      */
+/* 切到系统字体时不再使用内置字体，@font-face 是懒加载的，            */
+/* 浏览器不会下载没被用到的 woff2。                                    */
+/* ------------------------------------------------------------------ */
+html[data-font='system'] {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI',
+    'PingFang SC', 'Hiragino Sans GB', 'HarmonyOS Sans SC', 'Microsoft YaHei', 'Noto Sans SC',
+    sans-serif;
+  --font-serif: 'Songti SC', 'SimSun', 'Source Han Serif SC', Georgia, serif;
+}
