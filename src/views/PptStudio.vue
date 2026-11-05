@@ -24,7 +24,7 @@ import {
   type DeckFacts,
 } from '../ppt/model';
 import { exportDeckNotes, exportDeckPptx } from '../export/pptx';
-import { beginTask, endTask } from '../core/task-guard';
+import { askConfirm, beginTask, endTask } from '../core/task-guard';
 import type { Deck, SlideLayout } from '../core/types';
 
 const route = useRoute();
@@ -141,6 +141,20 @@ async function generate() {
 
 async function doExport() {
   if (!deck.value) return;
+  const high = (deck.value.issues ?? []).filter((i) => i.level === 'high');
+  if (high.length) {
+    const ok = await askConfirm({
+      title: `还有 ${high.length} 个高优先级问题`,
+      message: high
+        .slice(0, 4)
+        .map((i) => `· 第 ${i.page} 页：${i.text}`)
+        .join('\n'),
+      confirmText: '仍然导出',
+      cancelText: '先改一遍',
+      tone: 'warn',
+    });
+    if (!ok) return;
+  }
   await persist();
   await app.withBusy('正在生成演示文稿…', async () => {
     await exportDeckPptx(deck.value!, facts.value.project, facts.value.datasets);

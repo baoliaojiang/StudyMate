@@ -465,20 +465,87 @@ export const openaiResponses: ProviderAdapter = {
     const p = cfg.params ?? {};
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
     const rest = messages.filter((m) => m.role !== 'system');
+    const url = joinUrl(cfg.baseUrl, '/responses');
+    const body = {
+      model: effectiveModel,
+      instructions: system || undefined,
+      input: rest.map((m) => ({ role: m.role, content: m.content })),
+      temperature: opts.temperature ?? p.temperature ?? 0.4,
+      max_output_tokens: opts.maxTokens ?? p.maxTokens ?? 2048,
+      ...(p.topP != null ? { top_p: p.topP } : {}),
+    };
 
-    const res = await fetchJson<any>(joinUrl(cfg.baseUrl, '/responses'), {
+    /* ---------------------------- 真流式 ---------------------------- */
+    // 与 Chat Completions 走同一条 fetchSse 链路：页面只传 onDelta，不自己拼协议。
+    if (opts.streaming && opts.onDelta) {
+      let text = '';
+      let reasoning = '';
+      let modelName = effectiveModel;
+      let hitTokens: number | undefined;
+      let outTokens: number | undefined;
+      try {
+        const r = await fetchSse(url, {
+          timeoutMs: opts.timeoutMs ?? cfg.timeoutMs ?? 120000,
+          maxRetries: cfg.maxRetries ?? 1,
+          retriesBeforeFirstChunk: 1,
+          secrets: [apiKey],
+          signal: opts.signal,
+          headers: { Authorization: `Bearer ${apiKey}`, ...(p.headers ?? {}) },
+          body: { ...body, stream: true },
+          onData: (d: any) => {
+            if (d?.model) modelName = d.model;
+            const usage = d?.response?.usage;
+            if (usage) {
+              hitTokens = usage.input_tokens ?? hitTokens;
+              outTokens = usage.output_tokens ?? outTokens;
+            }
+            const type = typeof d?.type === 'string' ? d.type : '';
+            if (type === 'response.output_text.delta') {
+              const t = typeof d?.delta === 'string' ? d.delta : '';
+              if (t) {
+                text += t;
+                opts.onDelta?.({ text: t });
+              }
+              return;
+            }
+            // 推理摘要：不同服务商字段不同，只认带 reasoning 的事件与 delta
+            if (type.includes('reasoning') && typeof d?.delta === 'string' && d.delta) {
+              reasoning += d.delta;
+              opts.onDelta?.({ reasoning: d.delta });
+              return;
+            }
+            // 少数兼容网关不发 type，只在 data.delta 里给文本
+            if (!type && typeof d?.delta === 'string' && d.delta) {
+              text += d.delta;
+              opts.onDelta?.({ text: d.delta });
+            }
+          },
+        });
+        if (!text && !reasoning) {
+          throw new ProviderError('服务商没有返回任何内容', r.status, undefined, true);
+        }
+        return {
+          text,
+          model: modelName,
+          promptTokens: hitTokens,
+          completionTokens: outTokens,
+          duration: r.duration,
+          reasoning: reasoning || undefined,
+        };
+      } catch (e) {
+        // 已经吐过字就不能重放，否则界面会重复；一个字都没有才回退非流式
+        if (text || reasoning) throw e;
+      }
+    }
+
+    const res = await fetchJson<any>(url, {
       timeoutMs: opts.timeoutMs ?? cfg.timeoutMs ?? 60000,
       maxRetries: cfg.maxRetries ?? 1,
       secrets: [apiKey],
       signal: opts.signal,
       headers: { Authorization: `Bearer ${apiKey}`, ...(p.headers ?? {}) },
       body: {
-        model: effectiveModel,
-        instructions: system || undefined,
-        input: rest.map((m) => ({ role: m.role, content: m.content })),
-        temperature: opts.temperature ?? p.temperature ?? 0.4,
-        max_output_tokens: opts.maxTokens ?? p.maxTokens ?? 2048,
-        ...(p.topP != null ? { top_p: p.topP } : {}),
+        ...body,
         stream: false,
         ...(p.extraBody ?? {}),
       },

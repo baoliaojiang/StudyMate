@@ -29,6 +29,7 @@ import { BUILTIN_SKILLS } from '../skills/definitions';
 import { BUILTIN_AGENTS } from '../agents/definitions';
 import { backOr } from '../core/nav';
 import { SITE } from '../config/site';
+import { openExternal } from '../core/shell';
 
 const app = useAppStore();
 const route = useRoute();
@@ -84,6 +85,15 @@ watch(tab, (n, o) => {
 
 function go(t: Panel) {
   router.push(`/settings/${t}`);
+}
+
+/** 在线版入口：未成年人模式隐藏外链时一并收起 */
+function openOnline() {
+  if (!showSupport.value) {
+    app.toast('未成年人模式已隐藏外部链接', 'info');
+    return;
+  }
+  openExternal(SITE.online);
 }
 
 function back() {
@@ -282,6 +292,9 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
             </SettingRow>
             <SettingRow label="检查更新" :value="`v${SITE.version}`" chevron @click="go('update')">
               <template #icon><AppIcon name="update" /></template>
+            </SettingRow>
+            <SettingRow v-if="showSupport" label="在线版（免安装）" value="打开即用" chevron @click="openOnline">
+              <template #icon><AppIcon name="about" /></template>
             </SettingRow>
             <SettingRow label="重新引导" value="重看设置流程" chevron @click="router.push('/onboarding?replay=1')">
               <template #icon><AppIcon name="restart" /></template>

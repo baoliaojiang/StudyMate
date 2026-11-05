@@ -592,6 +592,11 @@ export interface AppSettings {
   aiMode: AiWorkMode;
   /** 深度思考：只对支持 reasoning 的模型生效，开启后界面展示思考过程 */
   thinking?: boolean;
+  /**
+   * 打字流速度。normal 按人类中文阅读速度（约 14 字/秒），
+   * slow 更慢一档，fast 用于快速扫读；超长内容仍有总时长上限，不会让人干等。
+   */
+  typingSpeed?: 'slow' | 'normal' | 'fast';
   /** 图片转述模型：主模型不吃图片时，先把图讲成文字 */
   visionModel?: { providerId: string; model: string };
   /** 用户启用的 Skill / Agent；空数组或未设置 = 全部启用 */

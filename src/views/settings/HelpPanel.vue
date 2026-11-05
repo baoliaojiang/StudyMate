@@ -9,7 +9,7 @@ import { AI_NOTICE_TEXT, DISCLAIMER_TEXT, SIMULATED_TEXT } from '../../core/sett
 import { TEMPLATE_NOTE } from '../../core/settings';
 import { SITE, externalLinks } from '../../config/site';
 import { openExternal } from '../../core/shell';
-import { resolveUpdateSource, hostOf } from '../../core/update-mirror';
+import { resolveUpdateSource, fetchLatestRelease, compareVersions, hostOf } from '../../core/update-mirror';
 import SettingGroup from '../../components/settings/SettingGroup.vue';
 import SettingRow from '../../components/settings/SettingRow.vue';
 import SubPage from '../../components/settings/SubPage.vue';
@@ -30,9 +30,26 @@ const links = computed(() => {
   const minor = app.settings.minor;
   return minor.enabled && minor.hideExternal ? [] : externalLinks();
 });
+/** 未成年人模式隐藏外链时，检查更新页与反馈页的链接也一起挡住 */
 function openLink(url: string) {
+  const minor = app.settings.minor;
+  if (minor.enabled && minor.hideExternal) {
+    app.toast('未成年人模式已隐藏外部链接', 'info');
+    return;
+  }
   openExternal(url);
 }
+
+/** 在线版是网页、安卓是安装包、其余按本地安装版显示 */
+const channelLabel = computed(() => {
+  if (typeof window === 'undefined') return '当前渠道：本地安装';
+  const host = window.location.hostname;
+  if (host.endsWith('github.io') || host.endsWith('workbuddy.cn')) return '当前渠道：在线版';
+  if (window.location.protocol === 'capacitor:' || (window as any).Capacitor?.isNativePlatform?.()) {
+    return '当前渠道：安卓安装';
+  }
+  return '当前渠道：本地安装';
+});
 
 /* 彩蛋：关于页里连点版本号 7 下 */
 const versionTaps = ref(0);
@@ -327,8 +344,8 @@ const faqGroups: FaqGroup[] = [
         a: '设置 → 其他设置 → 重新引导。只回看流程，不清空项目、记录或已保存的配置。',
       },
       {
-        q: '检查更新为什么总说已是最新？',
-        a: '还没配置更新源时，软件只核对本地版本号，不编造新版本，也不会下载任何东西。配置仓库地址后才会去读取发布信息。',
+        q: '检查更新会自己装上新版吗？',
+        a: '不会。它只读取 GitHub Releases 上实际发布的版本号，再把下载地址给你；不下载、不安装、不编造版本。网络不通时会如实说明读不到。',
       },
       {
         q: '反馈提到哪里？',
@@ -357,31 +374,77 @@ const faqTotal = computed(() => faqGroups.reduce((n, g) => n + g.items.length, 0
 
 const openFaq = ref<string | null>(faqGroups[0]?.items[0]?.q ?? null);
 const feedbackText = ref('');
-const updateState = ref<'idle' | 'checking' | 'none'>('idle');
+type UpdateState = 'idle' | 'checking' | 'none' | 'unreachable' | 'available' | 'up-to-date';
+const updateState = ref<UpdateState>('idle');
 
 const update = computed(() => app.settings.update);
 
 /** 检查更新后探测到的可用源地址（含协议），未探测或都连不上为 null */
 const reachedSource = ref<string | null>(null);
+const reachedVia = ref<'mirror' | 'repo' | null>(null);
+/** GitHub Releases 上真实存在的最新版本；读不到为 null */
+const latestRelease = ref<Awaited<ReturnType<typeof fetchLatestRelease>>>(null);
+const releaseReadable = ref(true);
+
+const sourceText = computed(() => {
+  if (!reachedSource.value) return '尚未检查';
+  return reachedVia.value === 'mirror' ? `镜像站可达 · ${hostOf(reachedSource.value)}` : `GitHub 官方可达 · ${hostOf(reachedSource.value)}`;
+});
+
+const latestText = computed(() => {
+  if (latestRelease.value) return `v${latestRelease.value.version}`;
+  if (!releaseReadable.value) return '暂时读不到发布信息';
+  return '检查后显示';
+});
+
+const releaseDateText = computed(() => {
+  const raw = latestRelease.value?.publishedAt;
+  if (!raw) return '';
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('zh-CN');
+});
 
 async function checkUpdate() {
   updateState.value = 'checking';
   reachedSource.value = null;
+  reachedVia.value = null;
+  latestRelease.value = null;
+  releaseReadable.value = true;
   // 没有配置任何更新源时，如实说明，不去连不存在的地址
   if (!update.value.mirrors.length && !update.value.githubRepo) {
     updateState.value = 'none';
     app.toast('还没有可用的更新源，先到「其他设置」里配置', 'warn', 4000);
     return;
   }
-  const src = await resolveUpdateSource(update.value.mirrors, update.value.githubRepo);
-  updateState.value = 'none';
-  if (!src.url) {
-    app.toast('暂时连不上更新源，请检查网络后重试', 'warn', 3600);
+  // 可达性探测与版本查询并行；两者互不冒充，读不到版本也仍可打开下载页
+  const [src, rel] = await Promise.all([
+    resolveUpdateSource(update.value.mirrors, update.value.githubRepo),
+    fetchLatestRelease(update.value.githubRepo),
+  ]);
+  reachedSource.value = src.url;
+  reachedVia.value = src.via;
+  latestRelease.value = rel;
+  if (!rel) {
+    releaseReadable.value = false;
+    updateState.value = src.url ? 'unreachable' : 'none';
+    app.toast(
+      src.url ? '源可达，但暂时读不到发布信息，可以直接打开下载页' : '暂时连不上更新源，请检查网络后重试',
+      'warn',
+      4200,
+    );
     return;
   }
-  reachedSource.value = src.url;
-  const where = src.via === 'mirror' ? '镜像站' : 'GitHub 官方';
-  app.toast(`已找到可用更新源（${where}），可前往查看最新版本`, 'info', 3600);
+  updateState.value = compareVersions(rel.version, VERSION) > 0 ? 'available' : 'up-to-date';
+  app.toast(
+    updateState.value === 'available' ? `发现新版本 v${rel.version}` : `当前 v${VERSION} 已是最新版本`,
+    updateState.value === 'available' ? 'ok' : 'info',
+    3600,
+  );
+}
+
+function openRelease() {
+  const url = latestRelease.value?.htmlUrl || SITE.releases;
+  openLink(url);
 }
 
 const { copied: feedbackCopied, copy: copyText } = useCopyFeedback();
@@ -533,14 +596,32 @@ async function sendFeedback() {
       <div class="ver">
         <img src="/icon.svg" alt="" class="logo" />
         <b>StudyMate v{{ VERSION }}</b>
-        <span>当前渠道：本地安装</span>
+        <span>{{ channelLabel }}</span>
       </div>
-      <SettingGroup>
+      <SettingGroup title="版本信息">
+        <SettingRow label="最新版本" :value="latestText" />
+        <SettingRow label="更新源" :value="sourceText" />
+        <SettingRow label="发布地址" :value="hostOf(SITE.releases)" chevron @click="openRelease" />
+      </SettingGroup>
+      <button class="btn btn-primary btn-block" type="button" :disabled="updateState === 'checking'" @click="checkUpdate">
+        {{ updateState === 'checking' ? '正在检查…' : '检查更新' }}
+      </button>
+
+      <div v-if="updateState === 'available' && latestRelease" class="upd-card">
+        <b>发现新版本 v{{ latestRelease.version }}</b>
+        <p v-if="releaseDateText">发布于 {{ releaseDateText }}。要不要更新由你决定，软件不会自动下载。</p>
+        <p v-else>要不要更新由你决定，软件不会自动下载。</p>
+        <button class="btn btn-sm btn-primary" type="button" @click="openRelease">查看下载页 →</button>
+      </div>
+      <p v-else-if="updateState === 'up-to-date'" class="upd-ok">当前已是最新版本。</p>
+
+      <SettingGroup title="其他入口">
+        <SettingRow label="在线版（免安装）" :value="hostOf(SITE.online)" chevron @click="openLink(SITE.online)" />
         <SettingRow
           label="GitHub 仓库"
-          :value="reachedSource ? hostOf(reachedSource) : (update.githubRepo ? hostOf(update.githubRepo) : '待补充（仓库尚未发布）')"
-          :chevron="!!(reachedSource || update.githubRepo)"
-          @click="(reachedSource || update.githubRepo) && openLink(reachedSource || update.githubRepo)"
+          :value="update.githubRepo ? hostOf(update.githubRepo) : '待补充'"
+          :chevron="!!update.githubRepo"
+          @click="update.githubRepo && openLink(update.githubRepo)"
         />
         <SettingRow
           label="作者主页"
@@ -555,11 +636,14 @@ async function sendFeedback() {
           @click="update.quarkUrl && openLink(update.quarkUrl)"
         />
       </SettingGroup>
-      <button class="btn btn-primary btn-block" type="button" :disabled="updateState === 'checking'" @click="checkUpdate">
-        {{ updateState === 'checking' ? '正在检查…' : '检查更新' }}
-      </button>
       <p class="note">
-        {{ updateState === 'checking' ? '正在依次探测镜像站可用性…' : '更新前会先探测哪个镜像可达，不会编造版本号，也不会下载任何东西。' }}
+        {{
+          updateState === 'checking'
+            ? '正在检查可达的更新源与最新发布版本…'
+            : updateState === 'unreachable' || updateState === 'none'
+              ? '暂时读不到发布信息时，可以直接打开下载页查看。'
+              : '版本信息来自 GitHub Releases，只读取真实发布的版本号，不下载、不安装。'
+        }}
       </p>
     </template>
 
@@ -668,8 +752,17 @@ async function sendFeedback() {
 .legal p { margin: 0; font-size: 12px; line-height: 1.8; color: var(--text-2); }
 
 .ver { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0 24px; }
-.ver b { font-size: 16px; }
+.ver b { font-size: 16px; font-variant-numeric: tabular-nums; }
 .ver span { font-size: 11.5px; color: var(--text-3); }
+
+.upd-card {
+  margin: 12px 0 0; padding: 14px 16px;
+  background: var(--surface-2); border-radius: var(--r-3);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+}
+.upd-card b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.upd-card p { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-2); }
+.upd-ok { margin: 12px 4px 0; font-size: 12px; color: var(--text-3); }
 
 .ver-tap { cursor: pointer; user-select: none; }
 .ver-tap:hover { color: var(--text-2); }

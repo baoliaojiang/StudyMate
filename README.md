@@ -28,8 +28,8 @@
 | 形态 | 地址 / 文件 | 说明 |
 | --- | --- | --- |
 | 在线版 | <https://baoliaojiang.github.io/StudyMate/> | 免安装，打开即用；数据存在当前浏览器 |
-| Windows | `StudyMate-1.0.11-setup.exe` / `StudyMate-1.0.11-portable.exe` | 安装版可选目录，便携版双击即用 |
-| Android | `StudyMate-1.0.11-release.apk` | 自签名 Release 包 |
+| Windows | `StudyMate-1.0.12-setup.exe` / `StudyMate-1.0.12-portable.exe` | 安装版可选目录，便携版双击即用 |
+| Android | `StudyMate-1.0.12-release.apk` | 自签名 Release 包 |
 | 源码 | 本仓库 `main` 分支 | 自行构建，见下方 |
 
 安装包与 APK 都放在 [Releases](https://github.com/baoliaojiang/StudyMate/releases)。应用内「设置 → 检查更新 / 关于」也直接放了本仓库、Releases 与 Issues 入口。Windows 未做代码签名，首次运行 SmartScreen 会提示「未知发布者」；Android 为自签名包，安装时系统也会给出提示。
@@ -46,8 +46,9 @@
 - **找资料**：OpenAlex / Crossref / arXiv / Semantic Scholar 等公开学术接口，以及通用网页检索；结果默认「待核实」，不会自动当事实
 - **写报告**：缺事实就留白（「待补充」），不编数据、访谈、文献；需要撑篇幅时可切「写满再核对」，推断一律标「需核实」
 - **看过程**：17 步工作流，5 道确认门和 1 道真实记录守卫；每一步实时显示正在做什么、耗时与调用次数，可暂停、继续、重试、改内容后再确认
-- **导交付**：单份 DOCX、研究记录合集、ZIP 资料包、Markdown、PPTX 与讲稿；PDF 走系统打印
-- **管数据**：IndexedDB 本机存储、口令加密的备份导出 / 恢复、一键清档
+- **导交付**：单份 DOCX、研究记录合集、按范围打包的 ZIP、Markdown、PPTX 与讲稿；导出前自动核对必填栏目、待核实来源与模拟标识，清单随包附带；PDF 走系统打印
+- **管数据**：IndexedDB 本机存储、口令加密的备份导出 / 恢复、一键清档；存储页可统计附件与全文占用，备份显示体积
+- **读得舒服**：打字流速度三档（适中按人类阅读速度），回复只跟随阅读位置，往上翻看时不会被拽回底部
 - **自定义**：开发者中心可查看并修改助手、技能、工作流与提示词；外部技能只接受声明式内容，不执行任何代码
 
 界面为浅色 / 深色 / 跟随系统三档，电脑与手机共用同一套导航；每一次页面切换都带方向感转场，可在设置里关闭动效。

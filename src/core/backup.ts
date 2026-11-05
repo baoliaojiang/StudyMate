@@ -22,9 +22,10 @@ import type {
   StudyRecord,
   UsageRecord,
   WorkflowDef,
+  WorkflowRun,
   AgentDefinition,
 } from './types';
-import type { ProviderRow } from './db';
+import type { LocalFileRow, ProviderRow } from './db';
 
 export const BACKUP_FORMAT = 'studymate-backup';
 export const BACKUP_VERSION = 1;
@@ -60,6 +61,9 @@ interface Payload {
   customSkills?: SkillDefinition[];
   decks?: import('./types').Deck[];
   workflows?: WorkflowDef[];
+  /** 本地文件全文索引与自动推进的历史运行：老备份没有，恢复时按空处理 */
+  localFiles?: LocalFileRow[];
+  workflowRuns?: WorkflowRun[];
 }
 
 export interface BackupCounts {
@@ -68,14 +72,20 @@ export interface BackupCounts {
   records: number;
   sources: number;
   providers: number;
+  localFiles?: number;
+  workflowRuns?: number;
 }
 
-/** 导出：返回可直接下载的 JSON 文本（整体加密） */
-export async function exportAllData(passphrase: string): Promise<{ text: string; counts: BackupCounts }> {
+/** 导出：返回可直接下载的 JSON 文本（整体加密）。onStage 供界面显示当前阶段 */
+export async function exportAllData(
+  passphrase: string,
+  onStage?: (stage: string) => void,
+): Promise<{ text: string; counts: BackupCounts }> {
   if (!passphrase || passphrase.length < 8) {
     throw new Error('备份口令至少 8 位');
   }
 
+  onStage?.('正在读取本机数据…');
   const providerRows = await db.providers.toArray();
   const providers: ProviderBackup[] = [];
   for (const p of providerRows) {
@@ -109,8 +119,11 @@ export async function exportAllData(passphrase: string): Promise<{ text: string;
     customSkills: await db.customSkills.toArray(),
     decks: await db.decks.toArray(),
     workflows: await db.workflows.toArray(),
+    localFiles: await db.localFiles.toArray(),
+    workflowRuns: await db.workflowRuns.toArray(),
   };
 
+  onStage?.('正在加密备份…');
   const sealed = await sealWithPassphrase(JSON.stringify(payload), passphrase);
   const envelope = {
     format: BACKUP_FORMAT,
@@ -122,6 +135,8 @@ export async function exportAllData(passphrase: string): Promise<{ text: string;
       records: payload.records.length,
       sources: payload.sources.length,
       providers: providers.length,
+      localFiles: payload.localFiles?.length ?? 0,
+      workflowRuns: payload.workflowRuns?.length ?? 0,
     },
     // 密文信封：{ v, salt, iv, data }
     data: sealed,
@@ -174,6 +189,8 @@ export async function importAllData(text: string, passphrase: string): Promise<I
       db.customSkills,
       db.decks,
       db.workflows,
+      db.localFiles,
+      db.workflowRuns,
     ],
     async () => {
       await Promise.all([
@@ -190,6 +207,8 @@ export async function importAllData(text: string, passphrase: string): Promise<I
         db.customSkills.clear(),
         db.decks.clear(),
         db.workflows.clear(),
+        db.localFiles.clear(),
+        db.workflowRuns.clear(),
       ]);
 
       if (payload.projects?.length) await db.projects.bulkAdd(payload.projects);
@@ -204,6 +223,8 @@ export async function importAllData(text: string, passphrase: string): Promise<I
       if (payload.customSkills?.length) await db.customSkills.bulkAdd(payload.customSkills);
       if (payload.decks?.length) await db.decks.bulkAdd(payload.decks);
       if (payload.workflows?.length) await db.workflows.bulkAdd(payload.workflows);
+      if (payload.localFiles?.length) await db.localFiles.bulkAdd(payload.localFiles);
+      if (payload.workflowRuns?.length) await db.workflowRuns.bulkAdd(payload.workflowRuns);
 
       for (const p of payload.providers ?? []) {
         const key = p.apiKey ?? '';
@@ -235,6 +256,8 @@ export async function importAllData(text: string, passphrase: string): Promise<I
     records: payload.records?.length ?? 0,
     sources: payload.sources?.length ?? 0,
     providers: payload.providers?.length ?? 0,
+    localFiles: payload.localFiles?.length ?? 0,
+    workflowRuns: payload.workflowRuns?.length ?? 0,
   };
 }
 

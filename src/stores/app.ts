@@ -87,6 +87,7 @@ export const useAppStore = defineStore('app', () => {
           notifications: { ...DEFAULT_SETTINGS.notifications, ...(row.notifications ?? {}) },
           features: { ...DEFAULT_SETTINGS.features, ...(row.features ?? {}) },
           voice: { ...DEFAULT_SETTINGS.voice, ...(row.voice ?? {}) },
+          update: { ...DEFAULT_SETTINGS.update, ...(row.update ?? {}) },
           phrases: Array.isArray(row.phrases) ? row.phrases : [...DEFAULT_SETTINGS.phrases],
         }
       : { ...DEFAULT_SETTINGS };

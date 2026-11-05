@@ -118,9 +118,19 @@ export const useProjectStore = defineStore('projects', () => {
   );
 
   async function loadStatusMap() {
-    const [allReports, allRecords] = await Promise.all([db.reports.toArray(), db.records.toArray()]);
+    const ids = list.value.map((p) => p.id);
+    if (!ids.length) {
+      statusMap.value = {};
+      return;
+    }
+    // 只取当前列表里项目的报告与记录：以前扫全库，项目一多首页会明显变慢。
+    // 两张表都有 projectId 索引，anyOf 走索引不会把长正文和图片整库读进内存。
+    const [allReports, allRecords] = await Promise.all([
+      db.reports.where('projectId').anyOf(ids).toArray(),
+      db.records.where('projectId').anyOf(ids).toArray(),
+    ]);
     const byProject = new Map<string, { reports: Report[]; records: StudyRecord[] }>();
-    for (const p of list.value) byProject.set(p.id, { reports: [], records: [] });
+    for (const id of ids) byProject.set(id, { reports: [], records: [] });
     for (const r of allReports) byProject.get(r.projectId)?.reports.push(r);
     for (const r of allRecords) byProject.get(r.projectId)?.records.push(r);
 
@@ -131,13 +141,23 @@ export const useProjectStore = defineStore('projects', () => {
     statusMap.value = next;
   }
 
-  async function loadList() {
-    loading.value = true;
+  /** App.vue 与 Home.vue 会在同一轮挂载里各调一次，合并成一次查询 */
+  let inflight: Promise<void> | null = null;
+  async function loadList(): Promise<void> {
+    if (inflight) return inflight;
+    inflight = (async () => {
+      loading.value = true;
+      try {
+        list.value = await db.projects.orderBy('updatedAt').reverse().toArray();
+        await loadStatusMap();
+      } finally {
+        loading.value = false;
+      }
+    })();
     try {
-      list.value = await db.projects.orderBy('updatedAt').reverse().toArray();
-      await loadStatusMap();
+      await inflight;
     } finally {
-      loading.value = false;
+      inflight = null;
     }
   }
 

@@ -20,7 +20,7 @@ import { describeImage, toDataUrl } from '../ai/vision';
 import { chatWithBudgetConfirm } from '../ai/budget';
 import type { StreamDelta } from '../ai/types';
 import { stripInlineThink } from '../ai/think';
-import { beginTask, endTask } from '../core/task-guard';
+import { askConfirm, beginTask, endTask } from '../core/task-guard';
 
 const app = useAppStore();
 const store = useProjectStore();
@@ -37,8 +37,12 @@ const boundProject = computed(() => {
 
 const draft = ref('');
 const sending = ref(false);
-/** 待发送的文本附件（图片暂不支持：接口层只接受文本，先如实说明） */
-const pending = ref<{ name: string; text: string }[]>([]);
+/** 首页项目卡先渲染一小批，项目多了点「显示更多」再展开，避免一次铺满整屏 */
+const projectLimit = ref(12);
+const visibleProjects = computed(() => store.list.slice(0, projectLimit.value));
+const moreProjects = computed(() => Math.max(0, store.list.length - projectLimit.value));
+/** 待发送的文本附件；图片由看图模型转述成文字，vision 标记用来提醒自行核对 */
+const pending = ref<{ name: string; text: string; vision?: boolean }[]>([]);
 /** 已等待秒数：让用户看得出是「在跑」还是「卡死」 */
 const elapsed = ref(0);
 /** 流式刚开始时还没有任何字：这时候显示三点，不然气泡会是空的 */
@@ -93,6 +97,10 @@ async function onFiles(e: Event) {
 
 /** 图片：先用转述模型讲成文字，再混进提示词 */
 async function transcribeImage(f: File) {
+  if (f.size > 8 * 1024 * 1024) {
+    app.toast(`「${f.name}」超过 8MB，先压缩或裁剪再上传`, 'warn', 4200);
+    return;
+  }
   const cfg = app.settings.visionModel;
   let row: ProviderRow | undefined;
   let model = cfg?.model ?? '';
@@ -118,7 +126,7 @@ async function transcribeImage(f: File) {
   try {
     const dataUrl = await toDataUrl(f);
     const desc = await describeImage(row, model, dataUrl, { question: draft.value.trim() || undefined });
-    pending.value.push({ name: `${f.name}（图片转述）`, text: desc });
+    pending.value.push({ name: `${f.name}（图片转述）`, text: desc, vision: true });
     app.toast('图片已转述成文字，确认无误再发送；图片本身不保存', 'ok', 4200);
   } catch (e) {
     app.toast(e instanceof Error ? e.message : '图片转述失败', 'error', 6000);
@@ -131,6 +139,15 @@ function dropFile(i: number) {
   pending.value.splice(i, 1);
 }
 const scroller = ref<HTMLElement | null>(null);
+/** 只有用户还在底部时才跟着新内容走；往上翻看前面时不要把人拽回来 */
+const stick = ref(true);
+function onThreadScroll() {
+  const el = scroller.value;
+  if (!el) return;
+  stick.value = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+}
+/** 打字流速度：设置里可切快速 / 适中 / 较慢，适中按人类阅读速度 */
+const typingSpeed = computed(() => app.settings.typingSpeed ?? 'normal');
 
 /** 是否已配置可用的模型服务——未配置时 AI 入口必须明说不可用，不能装作能用 */
 const aiReady = ref(false);
@@ -177,10 +194,21 @@ onMounted(async () => {
 /** 服务商增删 / 保存 Key / 拉取模型后立刻重算，不用重启 */
 watch(() => app.modelVersion, checkAi);
 
-async function scrollToEnd() {
+/**
+ * 跟着新内容往下走，但只在用户本来就在底部时。
+ * 用直接赋值 scrollTop 而不是 smooth：流式每 120ms 一次，平滑滚动会排成一长串。
+ */
+async function scrollToEnd(force = false) {
   await nextTick();
   const el = scroller.value;
-  if (el) el.scrollTop = el.scrollHeight;
+  if (!el) return;
+  if (!force && !stick.value) return;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function backToLatest() {
+  stick.value = true;
+  await scrollToEnd(true);
 }
 
 const greeting = computed(() => {
@@ -262,11 +290,20 @@ async function send(text?: string, entryKey?: keyof typeof MODE_ENTRY) {
   chat.push({ role: 'user', text: q, files: attach.length ? attach.map((a) => a.name) : undefined });
   const attachBlock = attach.length
     ? '\n\n【用户上传的附件内容（仅供参考，不得当作已核实的资料）】\n' +
-      attach.map((a) => `--- ${a.name} ---\n${a.text}`).join('\n\n')
+      attach
+        .map(
+          (a) =>
+            `--- ${a.name} ---` +
+            (a.vision ? '\n（由看图模型转述，可能与原图有出入，请自己核对）' : '') +
+            `\n${a.text}`,
+        )
+        .join('\n\n')
     : '';
   draft.value = '';
   pending.value = [];
-  await scrollToEnd();
+  // 刚发出消息一定跟到底部：这是用户自己触发的，不算「拽回来」
+  stick.value = true;
+  await scrollToEnd(true);
 
   // 未成年人模式：AI 生成受限，直接说明，不偷偷放行
   if (app.settings.minor.enabled && app.settings.minor.limitAi) {
@@ -513,9 +550,16 @@ async function send(text?: string, entryKey?: keyof typeof MODE_ENTRY) {
   }
 }
 
-function clearThread() {
+async function clearThread() {
   if (!chat.currentMsgs.length) return;
-  if (!confirm('清空这段对话？只清对话记录，项目和数据不受影响。')) return;
+  const ok = await askConfirm({
+    title: '清空这段对话',
+    message: '只清对话记录，项目和数据不受影响。',
+    confirmText: '清空',
+    cancelText: '先不清',
+    tone: 'warn',
+  });
+  if (!ok) return;
   chat.clearCurrent();
 }
 
@@ -525,7 +569,14 @@ function newChat() {
 }
 
 async function removeProject(id: string, name: string) {
-  if (!confirm(`删除「${name}」？本地记录会一起删除，无法恢复。`)) return;
+  const ok = await askConfirm({
+    title: `删除「${name}」`,
+    message: '本地记录会一起删除，删掉后无法恢复。建议先在数据与备份里导出一份。',
+    confirmText: '仍然删除',
+    cancelText: '先不删',
+    tone: 'warn',
+  });
+  if (!ok) return;
   await store.deleteProject(id);
   app.toast('已删除', 'ok');
 }
@@ -533,7 +584,7 @@ async function removeProject(id: string, name: string) {
 
 <template>
   <div class="home">
-    <div ref="scroller" class="thread">
+    <div ref="scroller" class="thread" @scroll.passive="onThreadScroll">
       <div class="inner">
         <!-- ===== 空状态：问候 + 快捷提问 + 最近项目 ===== -->
         <template v-if="!chat.currentMsgs.length">
@@ -577,7 +628,7 @@ async function removeProject(id: string, name: string) {
               <router-link to="/new" class="link">新建 →</router-link>
             </div>
             <article
-              v-for="(p, i) in store.list"
+              v-for="(p, i) in visibleProjects"
               :key="p.id"
               class="card card-tap project rise"
               :style="{ '--i': i }"
@@ -612,6 +663,14 @@ async function removeProject(id: string, name: string) {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </article>
+            <button
+              v-if="moreProjects"
+              class="btn btn-sm btn-block more-projects"
+              type="button"
+              @click="projectLimit += 12"
+            >
+              显示更多项目（还有 {{ moreProjects }} 个）
+            </button>
           </section>
 
           <p class="foot-note">第三方开源工具，与学校及其管理部门无隶属或合作关系。</p>
@@ -652,7 +711,9 @@ async function removeProject(id: string, name: string) {
                   <button class="think-head" type="button" @click="openThink = openThink === m.id ? null : m.id">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.4l-1.9-5.6L4.5 11 10.1 9z" /></svg>
                     <span>思考过程</span>
-                    <span class="think-meta">{{ m.reasoning.length }} 字</span>
+                    <span class="think-meta">
+                      {{ streamingId === m.id ? '思考中…' : '思考完成' }} · {{ m.reasoning.length }} 字
+                    </span>
                     <svg class="think-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
                   </button>
                   <div class="think-body">
@@ -660,6 +721,7 @@ async function removeProject(id: string, name: string) {
                       <TypingMarkdown
                         v-if="typingMsg?.id === m.id && typingMsg.stage === 'think'"
                         :text="m.reasoning"
+                        :speed="typingSpeed"
                         @done="typingMsg.stage = 'text'"
                       />
                       <MarkdownText v-else :text="m.reasoning" />
@@ -675,11 +737,13 @@ async function removeProject(id: string, name: string) {
                   <TypingMarkdown
                     v-if="typingMsg?.id === m.id && typingMsg.stage === 'text'"
                     :text="m.text"
+                    :speed="typingSpeed"
                     @done="typingMsg = null"
                   />
                   <div v-else class="md-stream">
                     <MarkdownText :text="m.text" />
                     <span v-if="streamingId === m.id" class="caret" aria-hidden="true" />
+                    <span v-if="streamingId === m.id" class="stream-time">{{ elapsed }}s</span>
                   </div>
                 </template>
               </template>
@@ -699,6 +763,9 @@ async function removeProject(id: string, name: string) {
         </template>
       </div>
     </div>
+
+    <!-- 用户往上翻时不要拽回去，想看最新内容自己点 -->
+    <button v-if="!stick" class="to-latest" type="button" @click="backToLatest">回到最新 ↓</button>
 
     <!-- ===== 输入区 ===== -->
     <div class="composer-wrap">
@@ -722,6 +789,7 @@ async function removeProject(id: string, name: string) {
             <span v-for="(f, i) in pending" :key="f.name" class="attach">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5H7.5A2.5 2.5 0 0 0 5 6v12a2.5 2.5 0 0 0 2.5 2.5h9A2.5 2.5 0 0 0 19 18V8.5z"/><path d="M14 3.5V8.5h5"/></svg>
               <span class="attach-name">{{ f.name }}</span>
+              <span class="attach-size">{{ f.text.length }} 字</span>
               <button class="attach-x" type="button" aria-label="移除附件" @click="dropFile(i)">×</button>
             </span>
           </div>
@@ -755,7 +823,19 @@ async function removeProject(id: string, name: string) {
 </template>
 
 <style scoped>
-.home { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.home { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+.to-latest {
+  position: absolute; left: 50%; bottom: 96px; z-index: 6;
+  transform: translateX(-50%);
+  padding: 7px 14px; border: none; border-radius: var(--r-full);
+  background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: 12px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  transition: color var(--dur-2) var(--ease-out);
+}
+.to-latest:hover { color: var(--text); }
+html[data-theme='dark'] .to-latest { background: var(--surface-3); }
 
 .thread {
   flex: 1 1 auto; min-height: 0;
@@ -878,6 +958,7 @@ async function removeProject(id: string, name: string) {
   background: transparent; color: var(--text-3); cursor: pointer;
 }
 .p-del:hover { border-color: var(--line); color: var(--danger); }
+.more-projects { margin: 4px 0 0; font-variant-numeric: tabular-nums; }
 .foot-note { margin: var(--sp-4) 0 var(--sp-3); font-size: 11px; color: var(--text-3); text-align: center; }
 
 /* ---------- 对话 ---------- */
@@ -971,6 +1052,11 @@ async function removeProject(id: string, name: string) {
 }
 @keyframes caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 html[data-motion='off'] .caret { animation: none; }
+/* 流式全程都能看到已等待秒数，不只是首字到来之前 */
+.stream-time {
+  margin-left: 8px; font-size: 11px; color: var(--text-3);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
 .think.open .think-inner { padding: 0 10px 10px; }
 @keyframes blink { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
 
@@ -1036,6 +1122,7 @@ html[data-motion='off'] .caret { animation: none; }
   color: var(--text-2); font-size: 11.5px;
 }
 .attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 15em; }
+.attach-size { flex: 0 0 auto; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .attach-x { border: none; background: none; color: var(--text-3); font-size: 14px; line-height: 1; cursor: pointer; padding: 0 0 0 2px; }
 .attach-btn {
   flex: 0 0 32px; width: 32px; height: 34px;

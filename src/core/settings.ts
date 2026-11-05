@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   simulatedNoticeAccepted: false,
   aiMode: 'assist',
   thinking: false,
+  typingSpeed: 'normal',
   visionModel: undefined,
   enabledSkills: [],
   enabledAgents: [],

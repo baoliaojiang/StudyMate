@@ -11,6 +11,8 @@ import { useRouter } from 'vue-router';
 import { backOr } from '../../core/nav';
 import { useAppStore } from '../../stores/app';
 import { db } from '../../core/db';
+import { dataUrlBytes } from '../../core/image';
+import { askConfirm } from '../../core/task-guard';
 import SubPage from '../../components/settings/SubPage.vue';
 import SettingGroup from '../../components/settings/SettingGroup.vue';
 import SettingRow from '../../components/settings/SettingRow.vue';
@@ -34,7 +36,14 @@ const counts = ref({
   chats: 0,
   cacheEntries: 0,
   ttsFiles: 0,
+  localFiles: 0,
+  workflowRuns: 0,
 });
+
+/** 大字段（导入文件全文、记录里的图片）按需计算，首屏不扫全库 */
+const measuring = ref(false);
+const measured = ref(false);
+const big = ref({ files: 0, images: 0, bytes: 0 });
 
 const CHAT_KEY = 'studymate:chat:v2';
 const TTS_KEY = 'studymate:tts-cache:v1';
@@ -56,14 +65,17 @@ function lsSize(key: string): number {
 async function refresh() {
   loading.value = true;
   try {
-    const [projects, reports, records, sources, datasets, usageRows] = await Promise.all([
-      db.projects.count(),
-      db.reports.count(),
-      db.records.count(),
-      db.sources.count(),
-      db.datasets.count(),
-      db.usage.count(),
-    ]);
+    const [projects, reports, records, sources, datasets, usageRows, localFiles, workflowRuns] =
+      await Promise.all([
+        db.projects.count(),
+        db.reports.count(),
+        db.records.count(),
+        db.sources.count(),
+        db.datasets.count(),
+        db.usage.count(),
+        db.localFiles.count(),
+        db.workflowRuns.count(),
+      ]);
     const chatsRaw = localStorage.getItem(CHAT_KEY);
     let chats = 0;
     try {
@@ -92,7 +104,19 @@ async function refresh() {
       ttsFiles = 0;
     }
 
-    counts.value = { projects, reports, records, sources, datasets, usage: usageRows, chats, cacheEntries, ttsFiles };
+    counts.value = {
+      projects,
+      reports,
+      records,
+      sources,
+      datasets,
+      usage: usageRows,
+      chats,
+      cacheEntries,
+      ttsFiles,
+      localFiles,
+      workflowRuns,
+    };
 
     if (navigator.storage?.estimate) {
       const est = await navigator.storage.estimate();
@@ -107,12 +131,18 @@ async function refresh() {
 onMounted(refresh);
 
 const chatSize = computed(() => lsSize(CHAT_KEY));
-const ttsSize = computed(() => lsSize(TTS_KEY));
 const quotaText = computed(() => (quota.value ? `可用配额 ${fmtSize(quota.value)}` : '配额信息不可用'));
 const usagePct = computed(() => (quota.value ? Math.min(100, (usage.value / quota.value) * 100) : 0));
 
 async function clearChats() {
-  if (!confirm('清空全部历史对话？项目、报告、记录都不会受影响，但对话记录无法恢复。')) return;
+  const ok = await askConfirm({
+    title: '清空全部历史对话',
+    message: '项目、报告、记录不受影响，但对话记录删掉后无法恢复。',
+    confirmText: '清空',
+    cancelText: '先不清',
+    tone: 'warn',
+  });
+  if (!ok) return;
   busy.value = true;
   try {
     localStorage.removeItem(CHAT_KEY);
@@ -124,7 +154,14 @@ async function clearChats() {
 }
 
 async function clearUsageLogs() {
-  if (!confirm('清空用量与调用记录？只影响统计数字，不影响项目内容。')) return;
+  const ok = await askConfirm({
+    title: '清空用量与调用记录',
+    message: '只影响统计数字，不影响项目内容。',
+    confirmText: '清空',
+    cancelText: '先不清',
+    tone: 'warn',
+  });
+  if (!ok) return;
   busy.value = true;
   try {
     await db.usage.clear();
@@ -147,7 +184,14 @@ async function clearTtsCache() {
 }
 
 async function clearCaches() {
-  if (!confirm('清理缓存？下次打开需要重新加载界面资源，数据不受影响。')) return;
+  const ok = await askConfirm({
+    title: '清理界面缓存',
+    message: '下次打开需要重新加载界面资源，数据不受影响。',
+    confirmText: '清理',
+    cancelText: '先不清',
+    tone: 'warn',
+  });
+  if (!ok) return;
   busy.value = true;
   try {
     if (typeof caches !== 'undefined') {
@@ -161,14 +205,68 @@ async function clearCaches() {
   }
 }
 
+/** 按需估算真正占地方的大字段：导入文件全文 + 记录里的图片 */
+async function measureBig() {
+  if (measuring.value) return;
+  measuring.value = true;
+  try {
+    let bytes = 0;
+    let files = 0;
+    let images = 0;
+    await db.localFiles.each((r) => {
+      files++;
+      bytes += new Blob([r.text ?? '']).size;
+    });
+    await db.records.each((r) => {
+      for (const a of r.attachments ?? []) {
+        if (a.kind !== 'image' || !a.dataUrl) continue;
+        images++;
+        bytes += dataUrlBytes(a.dataUrl);
+      }
+    });
+    big.value = { files, images, bytes };
+    measured.value = true;
+  } finally {
+    measuring.value = false;
+  }
+}
+
+/** 只清检索用的全文快照与已结束的推进历史，运行中的任务不动 */
+async function clearIndexes() {
+  const ok = await askConfirm({
+    title: '清理索引与推进历史',
+    message: `将删掉 ${counts.value.localFiles} 份导入文件的全文索引和已结束的推进历史。项目、报告、记录、来源不受影响；正在推进的任务会保留。`,
+    confirmText: '清理',
+    cancelText: '先不清',
+    tone: 'warn',
+  });
+  if (!ok) return;
+  busy.value = true;
+  try {
+    await db.localFiles.clear();
+    const rows = await db.workflowRuns.toArray();
+    const done = rows
+      .filter((r) => !['running', 'awaiting', 'paused'].includes(r.status))
+      .map((r) => r.id);
+    if (done.length) await db.workflowRuns.bulkDelete(done);
+    app.toast('索引与历史已清理，项目数据都还在', 'ok', 3600);
+    measured.value = false;
+    await refresh();
+  } finally {
+    busy.value = false;
+  }
+}
+
 /** 一次清掉全部「可安全清理」的项 */
 async function clearAllSafe() {
-  if (
-    !confirm(
-      '将清理：缓存、历史对话、用量记录、语音临时文件。\n\n项目、报告、过程记录、来源不会删除。清理后无法恢复，继续？',
-    )
-  )
-    return;
+  const ok = await askConfirm({
+    title: '清理可安全删除的内容',
+    message: '将清理：缓存、历史对话、用量记录、语音临时文件。项目、报告、过程记录、来源不会删除，清理后无法恢复。',
+    confirmText: '全部清理',
+    cancelText: '先不清',
+    tone: 'warn',
+  });
+  if (!ok) return;
   busy.value = true;
   try {
     localStorage.removeItem(CHAT_KEY);
@@ -211,11 +309,22 @@ function back() {
       <SettingRow label="历史对话" :value="`${counts.chats} 段 · ${fmtSize(chatSize)}`" />
       <SettingRow label="用量记录" :value="`${counts.usage} 条`" />
       <SettingRow label="界面缓存" :value="`${counts.cacheEntries} 组`" />
-      <SettingRow
-        label="语音文件"
-        note="朗读是现合成现播，播完即释放，不长期占空间"
-        :value="`${counts.ttsFiles} 个 · ${fmtSize(ttsSize)}`"
-      />
+      <SettingRow label="导入文件全文索引" :value="`${counts.localFiles} 份`" />
+      <SettingRow label="自动推进历史" :value="`${counts.workflowRuns} 次`" />
+      <SettingRow label="语音文件" note="朗读现合成现播，播完即释放" value="不占空间" />
+    </SettingGroup>
+
+    <SettingGroup title="大字段占用">
+      <p class="note" style="margin: 0 0 8px">
+        导入文件的全文和记录里的图片最占地方。点一下才统计，避免打开这页就翻全库。
+      </p>
+      <div class="measure">
+        <b v-if="measured">{{ fmtSize(big.bytes) }}</b>
+        <span v-if="measured" class="muted small">全文 {{ big.files }} 份 · 图片 {{ big.images }} 张</span>
+        <button class="btn btn-sm" type="button" :disabled="measuring" @click="measureBig">
+          {{ measuring ? '统计中…' : measured ? '重新统计' : '统计占用' }}
+        </button>
+      </div>
     </SettingGroup>
 
     <SettingGroup title="清理">
@@ -250,6 +359,13 @@ function back() {
         </span>
         <span class="act-go">›</span>
       </button>
+      <button class="act" type="button" :disabled="busy" @click="clearIndexes">
+        <span>
+          <b>清理索引与推进历史</b>
+          <span>导入文件全文快照、已结束的推进记录；项目内容不动</span>
+        </span>
+        <span class="act-go">›</span>
+      </button>
 
       <button class="btn btn-block" type="button" style="margin-top: 10px" :disabled="busy" @click="clearAllSafe">
         {{ busy ? '处理中…' : '全部清理（不含项目数据）' }}
@@ -281,4 +397,7 @@ function back() {
 .act span span { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
 .act-go { color: var(--text-3); font-size: 16px; }
 .act:disabled { opacity: 0.5; }
+.measure { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 2px 2px 6px; }
+.measure b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.measure button { margin-left: auto; }
 </style>

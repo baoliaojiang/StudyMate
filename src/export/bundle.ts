@@ -1,17 +1,47 @@
 import JSZip from 'jszip';
-import type { Project, Report, Source, StudyRecord } from '../core/types';
+import type { Project, Report, ReportKind, Source, StudyRecord } from '../core/types';
 import {
   buildRecordsDocx,
   buildReportDocx,
   recordsToMarkdown,
   reportToMarkdown,
 } from '../docx/builder';
+import { preflight, renderChecklist, summarizeChecks } from './preflight';
 
 export interface BundleInput {
   project: Project;
   reports: Report[];
   records: StudyRecord[];
   sources: Source[];
+}
+
+export interface ExportSelection {
+  /** 勾选哪几份章节型报告；空表示全部 */
+  reports?: ReportKind[];
+  /** 研究记录范围：按学期 / 篇号区间；不传表示全部 */
+  records?: { term?: 1 | 2; from?: number; to?: number };
+  includeMarkdown?: boolean;
+  includeSources?: boolean;
+  includeJson?: boolean;
+}
+
+/** 勾选的报告（progress 是记录表，不在这里重复导出） */
+export function selectReports(reports: Report[], sel: ExportSelection = {}): Report[] {
+  const wanted = sel.reports?.length ? new Set(sel.reports) : null;
+  return reports.filter((r) => r.kind !== 'progress' && (!wanted || wanted.has(r.kind)));
+}
+
+/** 按学期 / 篇号筛记录，始终按第几篇排序 */
+export function selectRecords(records: StudyRecord[], sel: ExportSelection = {}): StudyRecord[] {
+  const range = sel.records ?? {};
+  return records
+    .filter((r) => {
+      if (range.term && r.term !== range.term) return false;
+      if (range.from != null && r.index < range.from) return false;
+      if (range.to != null && r.index > range.to) return false;
+      return true;
+    })
+    .sort((a, b) => a.index - b.index);
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
@@ -30,17 +60,20 @@ export function safeName(s: string): string {
   return (s || '未命名').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 60);
 }
 
-/** 单份导出 */
+/** 单份导出；sel 只影响「过程记录」与 Markdown 的范围 */
 export async function exportOne(
   kind: 'proposal' | 'midterm' | 'final' | 'progress' | 'md',
   input: BundleInput,
+  sel: ExportSelection = {},
 ): Promise<void> {
   const { project, reports, records, sources } = input;
   const base = safeName(`${project.topic}_${project.groupName || ''}`);
 
   if (kind === 'progress') {
-    const blob = await buildRecordsDocx(project, records, sources);
-    downloadBlob(blob, `${base}_研究记录（${records.length}篇）.docx`);
+    const picked = selectRecords(records, sel);
+    if (!picked.length) throw new Error('选中的范围内没有研究记录');
+    const blob = await buildRecordsDocx(project, picked, sources);
+    downloadBlob(blob, `${base}_研究记录（${picked.length}篇）.docx`);
     return;
   }
   if (kind === 'md') {
@@ -57,44 +90,59 @@ export async function exportOne(
   downloadBlob(blob, `${base}_${report.title}.docx`);
 }
 
-/** 四份打包：ZIP 项目资料包 */
-export async function exportBundle(input: BundleInput): Promise<void> {
-  const { project, reports, records, sources } = input;
+/** 打包：ZIP 项目资料包。sel 可只打包选中的报告与记录范围 */
+export async function exportBundle(input: BundleInput, sel: ExportSelection = {}): Promise<void> {
+  const { project, sources } = input;
+  const reports = selectReports(input.reports, sel);
+  const records = selectRecords(input.records, sel);
   const base = safeName(`${project.topic}_${project.groupName || ''}`);
   const zip = new JSZip();
   const root = zip.folder(base)!;
 
+  if (!reports.length && !records.length) {
+    throw new Error('没有选中的报告或记录');
+  }
+
+  // 先把本机能查的都查一遍：清单既写进 ZIP，也让界面能提前提示
+  const checks = preflight({ project, reports, records, sources });
+
   for (const r of reports) {
-    if (r.kind === 'progress') continue;
     const kind = r.kind as 'proposal' | 'midterm' | 'final';
     const blob = await buildReportDocx(kind, project, r, sources, records);
     root.file(`${safeName(r.title)}.docx`, blob);
-    root.file(`${safeName(r.title)}.md`, reportToMarkdown(project, r, sources));
+    if (sel.includeMarkdown !== false) {
+      root.file(`${safeName(r.title)}.md`, reportToMarkdown(project, r, sources));
+    }
   }
 
   if (records.length) {
     root.file(`研究记录（${records.length}篇）.docx`, await buildRecordsDocx(project, records, sources));
-    root.file('研究记录.md', recordsToMarkdown(project, records));
+    if (sel.includeMarkdown !== false) root.file('研究记录.md', recordsToMarkdown(project, records));
   }
 
-  root.file(
-    '项目资料.json',
-    JSON.stringify(
-      {
-        导出时间: new Date().toISOString(),
-        声明:
-          '本资料包由研学帮 StudyMate（第三方开源工具）生成，不代表学校、教师或教育主管部门立场。AI 生成内容须核实后使用。',
-        项目: project,
-        报告: reports,
-        研究记录: records,
-        来源: sources,
-      },
-      null,
-      2,
-    ),
-  );
+  root.file('交付前核对.md', renderChecklist(checks));
 
-  root.file('来源清单.md', renderSourceMarkdown(sources));
+  if (sel.includeJson !== false) {
+    root.file(
+      '项目资料.json',
+      JSON.stringify(
+        {
+          导出时间: new Date().toISOString(),
+          声明:
+            '本资料包由研学帮 StudyMate（第三方开源工具）生成，不代表学校、教师或教育主管部门立场。AI 生成内容须核实后使用。',
+          项目: project,
+          报告: reports,
+          研究记录: records,
+          来源: sources,
+          交付检查: summarizeChecks(checks),
+        },
+        null,
+        2,
+      ),
+    );
+  }
+
+  if (sel.includeSources !== false) root.file('来源清单.md', renderSourceMarkdown(sources));
   root.file('README.txt', renderReadme(project, reports.length, records.length, sources.length));
 
   const out = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });

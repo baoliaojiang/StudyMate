@@ -1,23 +1,25 @@
 /**
  * 站点 / 维护者配置（发布前由维护者填写）
  *
- * 这里只放「链接与版本」，不放任何密钥。URL 全部通过 window.open 直接跳转用户浏览器，
- * 不经由任何中转服务。未填写的链接保持空串，界面显示「待补充」，绝不编造地址。
+ * 这里只放「链接与版本」，不放任何密钥。外链统一走 core/shell.ts 的 openExternal，
+ * 安卓用系统浏览器、桌面/Electron 用新标签页，不经由任何中转服务。
+ * 未填写的链接保持空串，界面显示「待补充」，绝不编造地址。
  *
- * 维护者清单（需求 V1.0）：
- *  - 作者主页（GitHub）：https://github.com/baoliaojiang（已填）
- *  - B 站主页：已填
- *  - 爱发电：已填
- *  - GitHub 仓库 / Releases / Issue：https://github.com/baoliaojiang/StudyMate（已填）
- *  - 夸克备用下载 / API 指引配置 / 更新 JSON / 应用图标：待维护者补充
+ * 维护者清单：
+ *  - 作者主页（GitHub）、B 站主页、爱发电：已填
+ *  - 在线版（GitHub Pages）、GitHub 仓库 / Releases / Issue：已填
+ *  - 夸克备用下载 / API 指引配置 / 更新 JSON：待维护者补充
  */
 export const SITE = {
   appName: '研学帮 StudyMate',
   /** 当前版本，需与 package.json 保持一致 */
-  version: '1.0.11',
+  version: '1.0.12',
 
   /** 作者主页（已填） */
   authorHome: 'https://github.com/baoliaojiang',
+
+  /** 在线版：GitHub Pages 项目站点，免安装、数据只存在当前浏览器 */
+  online: 'https://baoliaojiang.github.io/StudyMate/',
 
   /** 项目仓库：源码、下载与反馈都在这里 */
   github: 'https://github.com/baoliaojiang/StudyMate',
@@ -47,6 +49,7 @@ export interface SiteLink {
 /** 关于页要展示的外链，按顺序渲染；未配置的显示「待补充」且不可点 */
 export function externalLinks(): SiteLink[] {
   return [
+    { key: 'online', label: '在线版（免安装，打开即用）', url: SITE.online, ok: !!SITE.online },
     { key: 'authorHome', label: '作者主页（GitHub）', url: SITE.authorHome, ok: !!SITE.authorHome },
     { key: 'github', label: 'GitHub 开源仓库', url: SITE.github, ok: !!SITE.github },
     { key: 'releases', label: 'GitHub Releases 下载', url: SITE.releases, ok: !!SITE.releases },

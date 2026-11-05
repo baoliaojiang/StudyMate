@@ -38,6 +38,17 @@ async function toggleMemory(on: boolean) {
   app.toast(on ? 'AI 会参考项目上下文' : 'AI 不再读取项目上下文', 'info', 2200);
 }
 
+/** 打字流速度：适中按人类中文阅读速度，长文自动按比例提速 */
+const speedOptions = [
+  { key: 'fast' as const, label: '快速', desc: '约 29 字/秒' },
+  { key: 'normal' as const, label: '适中', desc: '约 14 字/秒' },
+  { key: 'slow' as const, label: '较慢', desc: '约 7 字/秒' },
+] as const;
+
+async function setTypingSpeed(v: 'fast' | 'normal' | 'slow') {
+  await app.saveSettings({ typingSpeed: v });
+}
+
 async function setMode(m: 'assist' | 'lead') {
   await app.saveSettings({ aiMode: m });
   app.toast(m === 'assist' ? '改为「AI 辅助」：先给提纲，由你确认' : '改为「AI 主导」：逐节生成，仍需你确认', 'info', 2400);
@@ -112,6 +123,25 @@ async function removePhrase(i: number) {
         />
       </SettingGroup>
 
+      <SettingGroup title="打字流速度">
+        <div class="speed-row">
+          <button
+            v-for="o in speedOptions"
+            :key="o.key"
+            class="speed"
+            :class="{ on: (app.settings.typingSpeed ?? 'normal') === o.key }"
+            type="button"
+            @click="setTypingSpeed(o.key)"
+          >
+            <b>{{ o.label }}</b>
+            <span>{{ o.desc }}</span>
+          </button>
+        </div>
+        <p class="note" style="margin: 0 14px 12px">
+          「适中」按人类中文阅读速度；回答很长时按比例提速，不会让人干等。往上翻看前面时页面不会自动往下拽。
+        </p>
+      </SettingGroup>
+
       <SettingGroup title="模型分配">
         <SettingRow
           label="自动分配模型"
@@ -167,6 +197,18 @@ async function removePhrase(i: number) {
 .mem-row:last-child { border-bottom: none; }
 .mem-row span { color: var(--text-3); flex: 0 0 96px; }
 .mem-row b { flex: 1; font-weight: var(--fw-medium); word-break: break-word; }
+.speed-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px 14px 8px; }
+.speed {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 9px; border: none; border-radius: var(--r-2);
+  background: var(--surface-2); color: var(--text-2);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+}
+.speed b { font-size: 13px; font-weight: var(--fw-medium); }
+.speed span { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.speed.on { background: var(--primary-soft, rgba(31, 79, 216, 0.12)); color: var(--text); }
+.speed.on b { color: var(--primary); }
 .add { display: flex; gap: 8px; padding: 14px; }
 .add .input { flex: 1; }
 .phrase {

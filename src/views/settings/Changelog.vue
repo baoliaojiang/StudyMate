@@ -3,6 +3,7 @@
 import { useRouter } from 'vue-router';
 import { CHANGELOG, LATEST_VERSION } from '../../core/changelog';
 import { SITE } from '../../config/site';
+import { openExternal } from '../../core/shell';
 import { backOr } from '../../core/nav';
 
 const router = useRouter();
@@ -37,8 +38,8 @@ function back() {
 
     <p class="note">
       更多历史版本与下载以
-      <a href="#" @click.prevent="router.push('/settings/update')">GitHub Releases</a>
-      为准。
+      <a :href="SITE.releases" @click.prevent="openExternal(SITE.releases)">GitHub Releases</a>
+      为准。想检查新版本，到「其他设置 → 检查更新」。
     </p>
   </div>
 </template>

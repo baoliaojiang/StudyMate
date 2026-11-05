@@ -7,6 +7,7 @@ import { db } from '../../core/db';
 import { maskKey, open_, seal, sealWithPassphrase } from '../../core/crypto';
 import { downloadBackup, exportAllData, importAllData } from '../../core/backup';
 import { useAppStore } from '../../stores/app';
+import { askConfirm } from '../../core/task-guard';
 import type { ProviderKind } from '../../core/types';
 import DangerWipe from '../../components/settings/DangerWipe.vue';
 import SettingGroup from '../../components/settings/SettingGroup.vue';
@@ -23,6 +24,15 @@ function back() {
 
 const backupPass = ref('');
 const exportingAll = ref(false);
+const exportStage = ref('');
+const lastSize = ref(0);
+
+function fmtSize(n: number): string {
+  if (!n) return '0 B';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
 const allFileInput = ref<HTMLInputElement | null>(null);
 const keyFileInput = ref<HTMLInputElement | null>(null);
 const showWipe = ref(false);
@@ -48,14 +58,21 @@ function passOk(): boolean {
 async function exportAll() {
   if (!passOk()) return;
   exportingAll.value = true;
+  exportStage.value = '正在准备…';
   try {
-    const { text, counts: c } = await exportAllData(backupPass.value);
+    const { text, counts: c } = await exportAllData(backupPass.value, (s) => (exportStage.value = s));
+    lastSize.value = new Blob([text]).size;
     downloadBackup(text);
-    app.toast(`已导出 ${c.projects} 个项目 / ${c.reports} 份报告 / ${c.records} 篇记录`, 'ok', 5000);
+    app.toast(
+      `已导出 ${c.projects} 个项目 / ${c.reports} 份报告 / ${c.records} 篇记录 · ${fmtSize(lastSize.value)}`,
+      'ok',
+      5000,
+    );
   } catch (e) {
     app.toast(e instanceof Error ? e.message : '导出失败', 'error', 5000);
   } finally {
     exportingAll.value = false;
+    exportStage.value = '';
   }
 }
 
@@ -67,7 +84,14 @@ async function importAll(e: Event) {
     input.value = '';
     return;
   }
-  if (!confirm('恢复会先清空本机现有全部数据，再写入备份内容。确定继续？')) {
+  const ok = await askConfirm({
+    title: '恢复会覆盖本机数据',
+    message: '先清空本机现有全部数据，再写入备份内容。建议先导出一份当前备份。',
+    confirmText: '仍然恢复',
+    cancelText: '先不恢复',
+    tone: 'warn',
+  });
+  if (!ok) {
     input.value = '';
     return;
   }
@@ -156,13 +180,17 @@ async function importKeyBackup(e: Event) {
     </label>
 
     <SettingGroup title="全量备份">
-      <SettingRow label="导出全部数据" note="项目 / 报告 / 记录 / 来源 / 数据集 / Key，整体加密">
+      <SettingRow
+        label="导出全部数据"
+        :note="exportStage || '项目 / 报告 / 记录 / 来源 / 本地文件索引 / 推进历史 / Key，整体加密'"
+      >
         <template #right>
           <button class="btn btn-sm btn-primary" type="button" :disabled="exportingAll" @click="exportAll">
             {{ exportingAll ? '导出中…' : '导出' }}
           </button>
         </template>
       </SettingRow>
+      <SettingRow v-if="lastSize" label="上次备份体积" :value="fmtSize(lastSize)" />
       <SettingRow label="从备份恢复" note="覆盖式恢复：先清空本机数据，再写入备份">
         <template #right>
           <button class="btn btn-sm" type="button" @click="allFileInput?.click()">选择文件</button>

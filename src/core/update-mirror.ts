@@ -5,8 +5,9 @@
  * 全部不可达时回退探测 githubRepo 本身；仍不可达返回 null。
  *
  * 说明：镜像站（如 ghproxy 系列）只是把 GitHub 内容做了反代，没有独立的
- * 版本查询接口，因此「检查更新」实质是可用性探测 + 把用户带到可访问的源。
- * 不会编造版本号，也不会真的下载任何东西。
+ * 版本查询接口，因此镜像只用于「可达性 + 备用打开」。
+ * 真正的版本号一律从 GitHub 官方 Releases 接口读取，读不到就如实说明；
+ * 不会编造版本号，也不会真的下载或安装任何东西。
  */
 
 /** 单个源探测超时（毫秒） */
@@ -70,4 +71,87 @@ export async function resolveUpdateSource(
 /** 取地址的 host 用于界面展示（去掉协议头） */
 export function hostOf(url: string): string {
   return url.replace(/^https?:\/\//, '');
+}
+
+/* ---------------------- GitHub Releases 版本查询 ---------------------- */
+
+export interface ReleaseInfo {
+  /** 原始 tag，如 v1.0.12 */
+  tag: string;
+  /** 去掉 v 前缀的版本号 */
+  version: string;
+  /** Releases 页面地址，供用户自己去看与下载 */
+  htmlUrl: string;
+  publishedAt: string;
+  name?: string;
+}
+
+const RELEASE_TIMEOUT_MS = 6500;
+
+/** 从仓库地址解析出 GitHub Releases API 地址；不是 GitHub 仓库时返回 null */
+export function releaseApiUrl(githubRepo: string): string | null {
+  const m = /github\.com[/:]([^/\s]+)\/([^/\s#?]+)/i.exec(githubRepo ?? '');
+  if (!m) return null;
+  const owner = m[1];
+  const repo = m[2].replace(/\.git$/i, '').replace(/\/$/, '');
+  if (!owner || !repo) return null;
+  return `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+}
+
+/** 版本号只按数字段比：v1.0.12 > 1.0.11，预发布后缀不参与排序 */
+export function compareVersions(a: string, b: string): number {
+  const left = (a.match(/\d+/g) ?? []).map(Number);
+  const right = (b.match(/\d+/g) ?? []).map(Number);
+  const len = Math.max(left.length, right.length);
+  for (let i = 0; i < len; i++) {
+    const x = left[i] ?? 0;
+    const y = right[i] ?? 0;
+    if (x !== y) return x > y ? 1 : -1;
+  }
+  return 0;
+}
+
+/**
+ * 只读取官方 Releases 的最新版本信息，不下载任何文件。
+ * 失败（网络、限流、仓库没有 Release、被拦）一律返回 null，由界面如实说明「读不到」。
+ * 参数 doFetch 只为测试注入，生产走全局 fetch。
+ */
+export async function fetchLatestRelease(
+  githubRepo: string,
+  doFetch: typeof fetch = fetch,
+): Promise<ReleaseInfo | null> {
+  const url = releaseApiUrl(githubRepo);
+  if (!url) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RELEASE_TIMEOUT_MS);
+  try {
+    const res = await doFetch(url, {
+      headers: { Accept: 'application/vnd.github+json' },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      tag_name?: unknown;
+      html_url?: unknown;
+      published_at?: unknown;
+      name?: unknown;
+    };
+    const tag = typeof data.tag_name === 'string' ? data.tag_name.trim() : '';
+    if (!tag) return null;
+    return {
+      tag,
+      version: tag.replace(/^v/i, ''),
+      htmlUrl:
+        typeof data.html_url === 'string' && data.html_url
+          ? data.html_url
+          : `${githubRepo.replace(/\/$/, '')}/releases`,
+      publishedAt: typeof data.published_at === 'string' ? data.published_at : '',
+      name: typeof data.name === 'string' ? data.name : undefined,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }

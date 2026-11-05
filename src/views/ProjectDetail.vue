@@ -8,12 +8,13 @@ import RecordList from '../components/RecordList.vue';
 import SourcePanel from '../components/SourcePanel.vue';
 import MemberPanel from '../components/MemberPanel.vue';
 import ProjectSettings from '../components/ProjectSettings.vue';
-import { exportBundle, exportOne } from '../export/bundle';
+import { exportBundle, exportOne, type ExportSelection } from '../export/bundle';
+import { countChecks, preflight, type DeliveryCheck } from '../export/preflight';
 import { MODE_ENTRY } from '../agents/definitions';
 import WorkflowPanel from '../components/workflow/WorkflowPanel.vue';
 import type { ReportKind, ReportStatus } from '../core/types';
 import { useWorkflowStore } from '../workflow/runner';
-import { beginTask, confirmLeave, endTask, pushOverlay } from '../core/task-guard';
+import { askConfirm, beginTask, confirmLeave, endTask, pushOverlay } from '../core/task-guard';
 
 const route = useRoute();
 const router = useRouter();
@@ -144,18 +145,71 @@ function askAi() {
   router.push({ path: '/', query: { project: p.value.id } });
 }
 
+/* ---------------------- 交付前核对与批量导出 ---------------------- */
+
+const checkOpen = ref(false);
+const checks = ref<DeliveryCheck[]>([]);
+const zipOpen = ref(false);
+/** 打包范围：默认三份报告全选，记录全学期 */
+const zipReports = ref<Record<string, boolean>>({ proposal: true, midterm: true, final: true });
+const zipTerm = ref<number>(0);
+const zipIncludeMd = ref(true);
+
+const checkStats = computed(() => countChecks(checks.value));
+
+function buildInput() {
+  return {
+    project: p.value!,
+    reports: store.reports,
+    records: store.records,
+    sources: store.sources,
+  };
+}
+
+function runCheck() {
+  if (!p.value) return;
+  checks.value = preflight(buildInput());
+  checkOpen.value = true;
+}
+
+/** 有阻塞项时先说明白，再由用户决定要不要继续导出 */
+async function confirmBlock(): Promise<boolean> {
+  if (!p.value) return false;
+  const list = preflight(buildInput());
+  checks.value = list;
+  const block = list.filter((c) => c.level === 'block');
+  if (!block.length) return true;
+  return askConfirm({
+    title: `有 ${block.length} 个问题需要先处理`,
+    message: block.map((c) => `· ${c.where}：${c.text}`).join('\n'),
+    confirmText: '仍然导出',
+    cancelText: '先处理',
+    tone: 'warn',
+  });
+}
+
 async function doExport(kind: 'proposal' | 'progress' | 'midterm' | 'final' | 'md' | 'zip') {
   if (!p.value) return;
+  if (!(await confirmBlock())) {
+    checkOpen.value = true;
+    return;
+  }
   await app.withBusy('正在生成文档…', async () => {
-    const input = {
-      project: p.value!,
-      reports: store.reports,
-      records: store.records,
-      sources: store.sources,
-    };
-    if (kind === 'zip') await exportBundle(input);
+    const input = buildInput();
+    if (kind === 'zip') await exportBundle(input, zipSelection());
     else await exportOne(kind as any, input);
   });
+}
+
+function zipSelection(): ExportSelection {
+  const picked = Object.entries(zipReports.value)
+    .filter(([, on]) => on)
+    .map(([k]) => k as ReportKind);
+  return {
+    reports: picked,
+    records: zipTerm.value ? { term: zipTerm.value as 1 | 2 } : undefined,
+    includeMarkdown: zipIncludeMd.value,
+  };
 }
 
 const recordPlanText = computed(() =>
@@ -303,13 +357,49 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
             <b>中期报告</b><span>DOCX · 表格版式</span>
           </button>
           <button class="exp" @click="doExport('final')">
-            <b>结题报告</b><span>DOCX · 含目录页码</span>
+            <b>结题报告</b><span>DOCX · 可选封面与目录</span>
           </button>
         </div>
         <div class="row wrap" style="margin-top: 12px">
           <button class="btn btn-sm btn-primary" @click="router.push(`/deck/${p.id}`)">生成答辩 PPT</button>
-          <button class="btn btn-sm" @click="doExport('zip')">打包下载全部（ZIP）</button>
+          <button class="btn btn-sm" type="button" @click="zipOpen = !zipOpen">打包下载（可选范围）</button>
           <button class="btn btn-sm" @click="doExport('md')">导出 Markdown</button>
+          <button class="btn btn-sm" type="button" @click="runCheck">
+            导出前核对<template v-if="checks.length">（{{ checkStats.block }} 必处理 / {{ checkStats.warn }} 提醒）</template>
+          </button>
+        </div>
+
+        <!-- 打包范围：折叠用 Grid 0fr→1fr，不写 JS 量高 -->
+        <div class="fold" :class="{ open: zipOpen }">
+          <div class="fold-in">
+            <div class="zip-box">
+              <span class="muted small">报告</span>
+              <label v-for="r in [{ k: 'proposal', t: '开题' }, { k: 'midterm', t: '中期' }, { k: 'final', t: '结题' }]" :key="r.k" class="zip-pick">
+                <input v-model="zipReports[r.k]" type="checkbox" /> {{ r.t }}
+              </label>
+              <span class="muted small">记录</span>
+              <select v-model.number="zipTerm" class="zip-select">
+                <option :value="0">全部学期</option>
+                <option :value="1">仅上学期</option>
+                <option :value="2">仅下学期</option>
+              </select>
+              <label class="zip-pick"><input v-model="zipIncludeMd" type="checkbox" /> 附 Markdown</label>
+              <button class="btn btn-sm btn-primary" type="button" @click="doExport('zip')">按选择打包</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="fold" :class="{ open: checkOpen }">
+          <div class="fold-in">
+            <ul v-if="checks.length" class="check-list">
+              <li v-for="c in checks" :key="c.id" :class="c.level">
+                <b>{{ c.level === 'block' ? '必须先处理' : '建议核对' }}</b>
+                <span>{{ c.where }}：{{ c.text }}</span>
+              </li>
+            </ul>
+            <p v-else class="muted small" style="margin: 10px 0 0">本机检查没发现问题。交之前仍要自己完整读一遍。</p>
+            <p class="muted small" style="margin: 8px 0 0">这份清单也会写进 ZIP（交付前核对.md），方便归档。</p>
+          </div>
         </div>
         <p class="muted small" style="margin: 12px 0 0; line-height: 1.7">
           文档导出的是真正的 Office Open XML，含模拟内容时文首自动加提示框，正文保留「（AI 模拟示例）」标识。<br />
@@ -490,6 +580,30 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 .exp:hover { background: var(--surface-3); transform: translateY(-1px); }
 .exp b { font-size: var(--fs-2); }
 .exp span { font-size: 11.5px; color: var(--text-3); }
+
+/* 折叠面板：Grid 0fr → 1fr，不写 JS 量高 */
+.fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-3) var(--ease-out); }
+.fold.open { grid-template-rows: 1fr; }
+.fold-in { overflow: hidden; min-height: 0; }
+
+.zip-box { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 2px 2px; font-size: 12.5px; }
+.zip-pick { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); cursor: pointer; }
+.zip-pick input { accent-color: var(--primary); }
+.zip-select {
+  border: none; border-radius: var(--r-1);
+  background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: 12.5px; padding: 5px 8px;
+}
+
+.check-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.check-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.65; }
+.check-list b {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: var(--fw-medium);
+  padding: 1px 6px; border-radius: var(--r-full);
+}
+.check-list li.block b { background: rgba(192, 57, 43, 0.12); color: var(--danger, #c0392b); }
+.check-list li.warn b { background: var(--surface-3); color: var(--text-3); }
+.check-list span { flex: 1; color: var(--text-2); }
 
 /* 抽屉 */
 .run-steps {

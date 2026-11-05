@@ -31,11 +31,20 @@ interface Group {
   latest?: StudyRecord;
 }
 
+/** 先按 projectId 分一次组：以前每个项目都全表 filter 一遍，项目多了会明显卡 */
+const byProject = computed(() => {
+  const map = new Map<string, StudyRecord[]>();
+  for (const r of records.value) {
+    const list = map.get(r.projectId);
+    if (list) list.push(r);
+    else map.set(r.projectId, [r]);
+  }
+  return map;
+});
+
 const groups = computed<Group[]>(() =>
   projects.value.map((project) => {
-    const list = records.value
-      .filter((r) => r.projectId === project.id)
-      .sort((a, b) => a.index - b.index);
+    const list = (byProject.value.get(project.id) ?? []).slice().sort((a, b) => a.index - b.index);
     const filled = list.filter((r) => r.work.trim() || r.activityName.trim()).length;
     const confirmed = list.filter((r) => r.confirmed).length;
     return {
@@ -106,7 +115,7 @@ function openLibrary() {
 
         <div class="dots">
           <span
-            v-for="n in g.total"
+            v-for="n in Math.min(g.total, 60)"
             :key="n"
             class="dot"
             :class="{
@@ -115,6 +124,7 @@ function openLibrary() {
             }"
             :title="g.list[n - 1]?.activityName || `第 ${n} 篇`"
           />
+          <span v-if="g.total > 60" class="dot-more">+{{ g.total - 60 }}</span>
         </div>
 
         <p v-if="g.latest" class="latest">
@@ -164,6 +174,7 @@ function openLibrary() {
 }
 .dot.filled { background: var(--primary-soft, rgba(31, 79, 216, 0.35)); }
 .dot.ok { background: var(--primary); }
+.dot-more { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .latest { margin: 0; font-size: 12.5px; color: var(--text-2); }
 .latest b { font-weight: var(--fw-strong); color: var(--text-3); }
 .latest .date { margin-left: 8px; font-size: 11px; color: var(--text-3); }
