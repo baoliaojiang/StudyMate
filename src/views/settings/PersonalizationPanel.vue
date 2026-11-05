@@ -49,6 +49,18 @@ async function setTypingSpeed(v: 'fast' | 'normal' | 'slow') {
   await app.saveSettings({ typingSpeed: v });
 }
 
+/** 字体大小：四档，改的是全站 --font-scale */
+const fontSizes = [
+  { v: 0.9, label: '小' },
+  { v: 1, label: '标准' },
+  { v: 1.1, label: '大' },
+  { v: 1.2, label: '特大' },
+] as const;
+
+async function setFontScale(v: number) {
+  await app.saveSettings({ fontScale: v });
+}
+
 async function setMode(m: 'assist' | 'lead') {
   await app.saveSettings({ aiMode: m });
   app.toast(m === 'assist' ? '改为「AI 辅助」：先给提纲，由你确认' : '改为「AI 主导」：逐节生成，仍需你确认', 'info', 2400);
@@ -121,6 +133,25 @@ async function removePhrase(i: number) {
           chevron
           @click="setMode('lead')"
         />
+      </SettingGroup>
+
+      <SettingGroup title="字体大小">
+        <div class="font-row">
+          <button
+            v-for="f in fontSizes"
+            :key="f.v"
+            class="font-size"
+            :class="{ on: Math.abs((app.settings.fontScale ?? 1) - f.v) < 0.01 }"
+            type="button"
+            @click="setFontScale(f.v)"
+          >
+            <b :style="{ fontSize: `${11 + f.v * 3}px` }">字</b>
+            <span>{{ f.label }}</span>
+          </button>
+        </div>
+        <p class="note" style="margin: 0 14px 12px">
+          全站正文、标题与按钮一起缩放；调大后长页面会更好读，表格内容也会跟着变大。
+        </p>
       </SettingGroup>
 
       <SettingGroup title="打字流速度">
@@ -197,6 +228,19 @@ async function removePhrase(i: number) {
 .mem-row:last-child { border-bottom: none; }
 .mem-row span { color: var(--text-3); flex: 0 0 96px; }
 .mem-row b { flex: 1; font-weight: var(--fw-medium); word-break: break-word; }
+.font-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 14px 14px 8px; }
+.font-size {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-height: 58px; padding: 8px 4px;
+  border: none; border-radius: var(--r-2);
+  background: var(--surface-2); color: var(--text-2);
+  font: inherit; cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+}
+.font-size b { font-weight: var(--fw-medium); line-height: 1; }
+.font-size span { font-size: 10.5px; color: var(--text-3); }
+.font-size.on { background: var(--primary-soft, rgba(31, 79, 216, 0.12)); color: var(--primary); }
+.font-size.on span { color: var(--primary); }
 .speed-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px 14px 8px; }
 .speed {
   display: flex; flex-direction: column; gap: 3px;

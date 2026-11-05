@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   motion: 'on',
   font: 'harmony',
+  fontScale: 1,
   devMode: false,
   disclaimerAccepted: false,
   agreements: { privacy: false, terms: false, statement: false },

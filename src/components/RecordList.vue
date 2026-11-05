@@ -229,7 +229,8 @@ async function confirmRecord() {
       </div>
     </section>
 
-    <!-- 编辑抽屉 -->
+    <!-- 编辑抽屉：进、出都有动效 -->
+    <Transition name="drawer">
     <div v-if="editing && draft" class="drawer-scrim" @click.self="close">
       <div class="drawer">
         <div class="drawer-head">
@@ -344,6 +345,7 @@ async function confirmRecord() {
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 </template>
 
@@ -377,8 +379,15 @@ async function confirmRecord() {
   display: flex; flex-direction: column; border: 1px solid var(--line);
   border-radius: var(--r-4);
   box-shadow: var(--shadow-3);
-  animation: slide 220ms var(--ease);
 }
+.drawer-enter-active, .drawer-leave-active { transition: opacity 200ms var(--ease-out); }
+.drawer-enter-active .drawer { transition: transform 260ms var(--ease-out); }
+.drawer-leave-active .drawer { transition: transform 200ms var(--ease-in); }
+.drawer-enter-from, .drawer-leave-to { opacity: 0; }
+.drawer-enter-from .drawer { transform: translateX(28px); }
+.drawer-leave-to .drawer { transform: translateX(28px); }
+html[data-motion='off'] .drawer-enter-active,
+html[data-motion='off'] .drawer-leave-active { transition: none; }
 @keyframes slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .drawer-head {
   display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px;

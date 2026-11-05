@@ -423,18 +423,32 @@ export const LEGAL_DOCS: LegalDoc[] = [
   {
     id: 'license',
     title: '开源许可',
-    summary: 'MIT 许可证正文，以及随应用分发的第三方组件许可。',
-    version: '1.0',
-    updatedAt: '2026-11-02',
+    summary: '允许二次分发与修改，但须保留原项目链接与作者信息；MIT 许可证正文与第三方组件许可。',
+    version: '1.1',
+    updatedAt: '2026-11-06',
     sections: [
       {
         heading: '附录：开源许可说明',
         body:
-          '本软件源代码以 MIT 许可证开源。你可以使用、修改与再分发，但须保留版权声明与许可证文本。第三方依赖遵循各自许可证。MIT 许可证全文、第三方依赖清单与版权声明，以软件内「设置 → 法务 → 开源许可」及项目仓库 LICENSE 文件为准。\n\n' +
+          '本软件源代码开源，允许二次分发与修改，唯一的附加要求是署名：分发时要在软件里看得见的地方保留原项目链接与作者信息。第三方依赖遵循各自许可证。许可全文与第三方依赖清单，以软件内本页及项目仓库 LICENSE 文件为准。\n\n' +
           '本附录仅为索引说明，不替代正式开源许可证文本；如本附录与许可证文本不一致，以许可证文本为准。',
       },
       {
-        heading: '一、MIT License',
+        heading: '一、二次分发与署名要求',
+        body:
+          '你可以直接转发本软件的安装包，也可以修改后再分发，不需要事先取得授权，也不需要付费。商用、改名、闭源集成都允许，不要求回馈代码。\n\n' +
+          '唯一的附加要求是署名——让使用者能点到原项目：\n' +
+          '· 对外分发的每个版本，都要在软件内使用者可到达的位置保留原项目信息，例如「设置 → 关于」里的项目链接；\n' +
+          '· 只写在安装包说明、压缩包文件名或源码注释里不算，必须是软件运行时能看见、能点开的入口；\n' +
+          '· 不允许删除、遮挡、置灰或以改名换皮的方式隐藏这条信息。\n\n' +
+          '原项目信息（请原样保留）：\n' +
+          '项目名：研学帮 StudyMate\n' +
+          '作者：baoliaojiang\n' +
+          '项目仓库：https://github.com/baoliaojiang/StudyMate\n\n' +
+          '二次分发的版本请注明「本版本由 …… 基于 StudyMate 修改」，不要让人误以为这是原作者发布的官方版本。',
+      },
+      {
+        heading: '二、MIT License',
         body:
           'Copyright (c) 2026 StudyMate Contributors\n\n' +
           'Permission is hereby granted, free of charge, to any person obtaining a copy of this software ' +
@@ -451,14 +465,14 @@ export const LEGAL_DOCS: LegalDoc[] = [
           'SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.',
       },
       {
-        heading: '二、随应用分发的第三方组件',
+        heading: '三、随应用分发的第三方组件',
         body:
           'Vue.js、Vite、Pinia、Vue Router（MIT）；Dexie.js（Apache-2.0）；docx（MIT）；JSZip（MIT 或 GPL-3.0，本项目按 MIT 使用）；' +
           'HarmonyOS Sans 字体（华为提供，按其许可条款随应用分发，仅用于界面显示）。\n\n' +
           '各组件的完整许可证文本随依赖包提供，可在项目仓库的 node_modules 对应目录中查阅。',
       },
       {
-        heading: '三、不含第三方素材',
+        heading: '四、不含第三方素材',
         body:
           '应用内不包含学校校徽、校名标识图片、商业字体或图库素材。界面图标为项目内绘制的线性图标。' +
           '若你认为某处内容侵犯了你的权利，可通过项目仓库的 Issue 联系，核实后会移除。',

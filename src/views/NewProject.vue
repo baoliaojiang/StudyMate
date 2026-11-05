@@ -15,6 +15,7 @@ import {
 } from '../reports/requirement';
 import { SCHOOL_TOPICS, TOPIC_SUBJECTS } from '../reports/topics';
 import { chatWithBudgetConfirm } from '../ai/budget';
+import MarkdownText from '../components/MarkdownText.vue';
 
 const app = useAppStore();
 const store = useProjectStore();
@@ -78,9 +79,112 @@ async function draftRequirement() {
   }
 }
 
+/* ------------------------- 拿不定主意？AI 帮你想 ------------------------- */
+
+const ideaOpen = ref(false);
+const ideaBusy = ref(false);
+const ideaText = ref('');
+const ideaSubject = ref('');
+const ideaMode = ref<ResearchMode>('practice');
+const ideaList = ref<{ topic: string; why: string }[]>([]);
+const ideaErr = ref('');
+
+function openIdeas() {
+  if (!ideaOpen.value) {
+    ideaErr.value = '';
+  }
+  ideaOpen.value = true;
+}
+
+/** 从模型输出里尽量抠出 [{topic, why}]：脏输出不能直接崩页面 */
+function parseIdeas(raw: string): { topic: string; why: string }[] {
+  const s = String(raw || '').trim();
+  const a = s.indexOf('[');
+  const b = s.lastIndexOf(']');
+  if (a >= 0 && b > a) {
+    try {
+      const arr = JSON.parse(s.slice(a, b + 1));
+      if (Array.isArray(arr)) {
+        const out = arr
+          .map((x) => ({
+            topic: String((x as { topic?: unknown })?.topic ?? (x as { 主题?: unknown })?.主题 ?? '').trim(),
+            why: String((x as { why?: unknown })?.why ?? (x as { 理由?: unknown })?.理由 ?? '').trim(),
+          }))
+          .filter((x) => x.topic)
+          .slice(0, 4);
+        if (out.length) return out;
+      }
+    } catch {
+      /* 落到按行解析 */
+    }
+  }
+  // 退化：一行一个编号条目，冒号后的算理由
+  return s
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^[\s\-*·•]*\d*[.、)）]?\s*/, '').trim())
+    .filter((l) => l.length > 4)
+    .slice(0, 4)
+    .map((l) => {
+      const m = l.match(/^(.{4,40}?)[：:，,]\s*(.*)$/);
+      return m ? { topic: m[1].trim(), why: m[2].trim() } : { topic: l.slice(0, 40), why: '' };
+    });
+}
+
+async function suggestIdeas() {
+  if (!aiReady.value) {
+    ideaErr.value = '还没有可用的模型。到 设置 → 模型服务 接一个就能用。';
+    return;
+  }
+  if (ideaBusy.value) return;
+  ideaBusy.value = true;
+  ideaErr.value = '';
+  try {
+    const res = await chatWithBudgetConfirm(app.gateway, {
+      messages: [
+        {
+          role: 'system',
+          content:
+            '你在帮中学生想「研究性学习」的选题。给 3 个可以直接开做的具体题目，每个题目要能在校内容易完成、两周到一学期内做得完、不需要买设备。' +
+            '只输出 JSON 数组，形如 [{"topic":"题目","why":"一句话说明为什么适合他，能怎么做"}]，不要任何多余文字、不要代码块标记。' +
+            '不要编造数据、调查结果或学校规定；题目不要写成论文标题那种空话。',
+        },
+        {
+          role: 'user',
+          content: [
+            `学生的兴趣或想法：${ideaText.value.trim() || '没想好，随便给几个靠谱方向'}`,
+            `想做的学科方向：${ideaSubject.value || '不限'}`,
+            `研究方式：${modes.find((m) => m.key === ideaMode.value)?.label ?? '实践研究'}`,
+            `年级：${form.grade || '未填'}`,
+          ].join('\n'),
+        },
+      ],
+      agentId: 'project-planner',
+      tier: 'cheap',
+      temperature: 0.85,
+      maxTokens: 700,
+      cacheKey: 'topic-ideas',
+    });
+    const list = parseIdeas(res.text);
+    if (!list.length) {
+      ideaErr.value = '这次没想出来，换个说法再试一次。';
+      return;
+    }
+    ideaList.value = list;
+  } catch (e) {
+    ideaErr.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    ideaBusy.value = false;
+  }
+}
+
+function useIdea(t: string) {
+  form.topic = t;
+  ideaOpen.value = false;
+  app.toast('已经填进研究主题，可以再改', 'info', 2600);
+}
+
 const step = ref(0);
 const totalSteps = 4;
-
 const form = reactive({
   topic: '',
   teacher: '',
@@ -403,6 +507,11 @@ async function create() {
           </button>
         </div>
         <span class="field-hint">清单来自学校下发的《研究性学习备选课题》，也可以自己定题。</span>
+        <button class="idea-entry" type="button" @click="openIdeas">
+          <span class="idea-spark">✦</span>
+          拿不定主意？AI 帮你想
+          <span class="idea-arrow">→</span>
+        </button>
       </label>
 
       <label class="field">
@@ -736,6 +845,86 @@ async function create() {
         </div>
       </div>
     </Teleport>
+    <!-- 拿不定主意？AI 帮你想 -->
+    <Teleport to="body">
+      <Transition name="pop">
+        <div v-if="ideaOpen" class="picker-scrim" @click.self="ideaOpen = false">
+          <div class="picker idea" role="dialog" aria-label="AI 帮你想主题">
+            <div class="picker-head">
+              <div class="grow">
+                <b>拿不定主意？让 AI 给你几个方向</b>
+                <p class="muted small" style="margin: 4px 0 0; line-height: 1.7">
+                  说一句你平时在意什么，AI 给 3 个能直接开做的题目。选中只是填进「研究主题」，还能改。
+                </p>
+              </div>
+              <button class="btn btn-sm" type="button" @click="ideaOpen = false">关闭</button>
+            </div>
+
+            <div class="idea-body">
+              <textarea
+                v-model="ideaText"
+                class="textarea"
+                style="min-height: 84px"
+                placeholder="例如：每天在学校门口堵车 / 食堂剩饭很多 / 喜欢打羽毛球但没场地 / 想弄明白短视频为什么停不下来"
+              />
+
+              <div class="idea-filters">
+                <div class="chips" style="padding: 0">
+                  <button class="chip" :class="{ on: !ideaSubject }" type="button" @click="ideaSubject = ''">不限学科</button>
+                  <button
+                    v-for="s in TOPIC_SUBJECTS"
+                    :key="s"
+                    class="chip"
+                    :class="{ on: ideaSubject === s }"
+                    type="button"
+                    @click="ideaSubject = ideaSubject === s ? '' : s"
+                  >
+                    {{ s }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="idea-filters">
+                <div class="chips" style="padding: 0">
+                  <button
+                    v-for="m in modes"
+                    :key="m.key"
+                    class="chip"
+                    :class="{ on: ideaMode === m.key }"
+                    type="button"
+                    @click="ideaMode = m.key"
+                  >
+                    {{ m.label }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="row-between" style="margin-top: 4px">
+                <span v-if="!aiReady" class="muted small">AI 不可用 · 未配置模型</span>
+                <span v-else-if="ideaErr" class="small" style="color: var(--danger)">{{ ideaErr }}</span>
+                <span v-else class="muted small">题目只是起点，确认前请对照老师要求</span>
+                <button class="btn btn-sm btn-primary" type="button" :disabled="ideaBusy || !aiReady" @click="suggestIdeas">
+                  {{ ideaBusy ? '正在想…' : ideaList.length ? '换一批' : '帮我想几个' }}
+                </button>
+              </div>
+
+              <div v-if="ideaList.length" class="idea-list">
+                <button v-for="(it, i) in ideaList" :key="i" class="idea-item" type="button" @click="useIdea(it.topic)">
+                  <span class="idea-no">{{ i + 1 }}</span>
+                  <span class="grow">
+                    <b>{{ it.topic }}</b>
+                    <MarkdownText v-if="it.why" class="idea-why" :text="it.why" />
+                  </span>
+                  <span class="muted small">用这个</span>
+                </button>
+              </div>
+
+              <p v-if="ideaBusy && !ideaList.length" class="muted small idea-wait">正在按你的想法组题…</p>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -855,15 +1044,24 @@ async function create() {
   position: fixed; inset: 0; z-index: 70;
   background: rgba(12, 13, 16, 0.5);
   display: flex; align-items: center; justify-content: center;
-  padding: 16px; animation: fade var(--dur-2) var(--ease-out);
+  /* 上下都避开状态栏与手势条，弹层不再被裁掉一截 */
+  padding: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 14px) 14px
+    calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 14px);
+  box-sizing: border-box;
+  animation: fade var(--dur-2) var(--ease-out);
 }
 .picker {
-  width: min(560px, 100%); max-height: min(84vh, 720px);
+  width: min(560px, 100%);
+  /* 100% 相对遮罩的内容区（已扣掉安全区留白），永远整块可见 */
+  max-height: 100%; min-height: 0;
   display: flex; flex-direction: column;
   background: var(--bg); border-radius: var(--r-4);
   box-shadow: var(--shadow-3); overflow: hidden;
   animation: pop var(--dur-3) var(--spring-under);
 }
+.picker.idea { width: min(620px, 100%); }
+/* 头部/搜索/筛选不参与滚动，只有列表滚 */
+.picker-head, .picker-bar, .chips, .idea-body > .row-between { flex: 0 0 auto; }
 .picker-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px 10px; }
 .picker-bar { padding: 0 18px 8px; display: flex; }
 .chips { display: flex; gap: 6px; overflow-x: auto; padding: 0 18px 10px; scrollbar-width: none; }
@@ -876,7 +1074,12 @@ async function create() {
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 .chip.on { background: var(--text); color: var(--bg); }
-.picker-list { flex: 1 1 auto; overflow-y: auto; padding: 0 10px 14px; }
+.picker-list {
+  flex: 1 1 auto; min-height: 96px;
+  overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 10px 14px;
+}
 .topic-item {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 10px 8px; border: none; border-radius: var(--r-2);
@@ -889,4 +1092,55 @@ async function create() {
 .topic-sub { font-size: 11.5px; color: var(--text-3); flex: 0 0 auto; }
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.98) } to { opacity: 1; transform: none } }
+
+/* 拿不定主意？AI 帮你想 */
+.idea-entry {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 10px; padding: 7px 12px 7px 10px;
+  border: none; border-radius: var(--r-full);
+  background: var(--primary-soft); color: var(--primary);
+  font-size: 12.5px; font-weight: var(--fw-strong); cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.idea-entry:hover { background: var(--primary-soft-2, var(--surface-2)); transform: translateY(-1px); }
+.idea-spark { font-size: 12px; opacity: 0.9; }
+.idea-arrow { opacity: 0.55; transition: transform var(--dur-2) var(--ease-out); }
+.idea-entry:hover .idea-arrow { transform: translateX(3px); }
+
+.idea-body {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 0 18px calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+}
+.idea-filters { display: flex; flex-direction: column; }
+.idea-filters .chips { padding: 0; }
+.idea-list { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+.idea-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 100%; padding: 12px 10px; text-align: left;
+  border: none; border-radius: var(--r-3);
+  background: var(--surface-2); cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.idea-item:hover { background: var(--surface-3); transform: translateY(-1px); }
+.idea-item b { font-size: var(--fs-2); font-weight: var(--fw-strong); display: block; }
+.idea-no {
+  width: 18px; height: 18px; flex: 0 0 18px; margin-top: 2px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: var(--bg); color: var(--text-3);
+  font-size: 10.5px; font-variant-numeric: tabular-nums;
+}
+.idea-why { display: block; margin-top: 4px; font-size: 11.5px; color: var(--text-3); line-height: 1.7; }
+.idea-wait { padding: 14px 2px; }
+
+@media (max-width: 560px) {
+  .picker { max-height: 92%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .picker, .picker-scrim { animation-duration: 190ms; }
+}
+html[data-motion='off'] .picker,
+html[data-motion='off'] .picker-scrim { animation: none; }
 </style>

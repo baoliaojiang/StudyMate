@@ -667,9 +667,9 @@ async function setStatus(next: ReportStatus) {
         <p v-if="gapMode === 'strict'" class="muted small" style="margin: 8px 0 0; line-height: 1.65">
           缺事实就写「待补充」，不替你编数据、访谈或实验结果。
         </p>
-        <p v-else class="fill-note">
-          {{ FILL_DISCLAIMER }}
-        </p>
+        <div v-else class="fill-note">
+          <MarkdownText :text="FILL_DISCLAIMER" />
+        </div>
       </div>
 
       <!-- 状态 -->
@@ -884,11 +884,18 @@ async function setStatus(next: ReportStatus) {
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border-radius: var(--r-2);
 }
-.gaps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }.gaps li { display: flex; gap: 6px; font-size: 11.5px; line-height: 1.55; }
-.gaps b { flex: 0 0 auto; color: var(--warn); font-weight: var(--fw-strong); }
+.gaps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.gaps li { display: flex; align-items: flex-start; gap: 7px; font-size: var(--fs-1); line-height: 1.7; }
+/* 标签不再抢走正文宽度：钉在小胶囊里且不换行，文字列可以正常折行 */
+.gaps b {
+  flex: 0 0 auto; white-space: nowrap;
+  padding: 1px 7px; border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--warn); font-weight: var(--fw-strong); font-size: var(--fs-1); line-height: 1.6;
+}
 .gaps li.block b { color: var(--danger); }
-.gaps span { color: var(--text-2); }
-.gaps i { display: block; font-style: normal; font-size: 10.5px; color: var(--text-3); margin-top: 2px; }
+.gaps span { flex: 1 1 auto; min-width: 0; color: var(--text-2); overflow-wrap: anywhere; word-break: break-word; text-wrap: pretty; }
+.gaps i { display: block; font-style: normal; font-size: var(--fs-1); color: var(--text-3); margin-top: 3px; }
 
 .status-seg {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;

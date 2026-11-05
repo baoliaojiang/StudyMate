@@ -580,6 +580,8 @@ export interface AppSettings {
   motion: 'on' | 'off';
   /** 界面字体：默认内置 HarmonyOS Sans；可切回系统字体 */
   font: 'harmony' | 'system';
+  /** 字体大小倍率：0.85–1.3，默认 1；改 --font-scale，全站字阶一起缩放 */
+  fontScale?: number;
   /** 状态栏额外留白（px）：部分机型 env() 返回 0，顶栏会压到状态栏下面，用户可手动补 */
   safeTopPad?: number;
   devMode: boolean;

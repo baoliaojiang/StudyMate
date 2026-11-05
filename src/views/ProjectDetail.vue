@@ -8,13 +8,14 @@ import RecordList from '../components/RecordList.vue';
 import SourcePanel from '../components/SourcePanel.vue';
 import MemberPanel from '../components/MemberPanel.vue';
 import ProjectSettings from '../components/ProjectSettings.vue';
+import MarkdownText from '../components/MarkdownText.vue';
 import { exportBundle, exportOne, type ExportSelection } from '../export/bundle';
 import { countChecks, preflight, type DeliveryCheck } from '../export/preflight';
 import { MODE_ENTRY } from '../agents/definitions';
 import WorkflowPanel from '../components/workflow/WorkflowPanel.vue';
 import type { ReportKind, ReportStatus } from '../core/types';
 import { useWorkflowStore } from '../workflow/runner';
-import { askConfirm, beginTask, confirmLeave, endTask, pushOverlay } from '../core/task-guard';
+import { askConfirm, beginTask, endTask, pushOverlay } from '../core/task-guard';
 
 const route = useRoute();
 const router = useRouter();
@@ -52,9 +53,26 @@ function openWorkflow(scope: 'report' | 'stage' | 'project') {
   workflowOpen.value = true;
 }
 
-/** 关面板也算「退出」：任务在跑时先问一句 */
+/** 关面板也算「退出」：还在推进/等确认/暂停时先说明会暂停、会丢什么 */
 async function closeWorkflow(): Promise<boolean> {
-  if (!(await confirmLeave())) return false;
+  const r = wf.run;
+  const live = !!r && ['running', 'paused', 'awaiting'].includes(r.status);
+  if (live) {
+    const state =
+      r.status === 'running'
+        ? '还在推进'
+        : r.status === 'awaiting'
+          ? '正停在确认这一步'
+          : '已暂停';
+    const ok = await askConfirm({
+      title: '退出这个页面，推进会停下来',
+      message: `当前${state}。退出后不会在后台继续跑，正在等待的确认、这次还没保存的修改都会丢；已经完成的步骤和已生成的内容会留着，回来点「继续」还能接着走。`,
+      confirmText: '仍然退出',
+      cancelText: '留在页面',
+      tone: 'warn',
+    });
+    if (!ok) return false;
+  }
   workflowOpen.value = false;
   return true;
 }
@@ -409,7 +427,9 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 
       <div v-if="p.requirementText" class="card card-pad" style="margin-top: 12px">
         <div class="card-label">教师要求原文</div>
-        <pre class="req-text">{{ p.requirementText.slice(0, 1200) }}{{ p.requirementText.length > 1200 ? '\n…' : '' }}</pre>
+        <div class="req-text">
+          <MarkdownText :text="p.requirementText.slice(0, 1200) + (p.requirementText.length > 1200 ? '\n\n…' : '')" />
+        </div>
       </div>
 
       <div v-if="hasSim" class="banner banner-sim" style="margin-top: 12px">
@@ -426,16 +446,18 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
     <MemberPanel v-else-if="tab === 'members'" />
     <ProjectSettings v-else-if="tab === 'settings'" />
 
-    <!-- 项目推进面板 -->
-    <div v-if="workflowOpen" class="drawer-scrim" @click.self="closeWorkflow()">
-      <div class="wf-sheet">
-        <WorkflowPanel
-          :initial-scope="wfScope"
-          @close="closeWorkflow()"
-          @goto="onGoto"
-        />
+    <!-- 项目推进面板：整页接管，左侧进、左侧出，和路由转场同一套方向感 -->
+    <Transition name="wf">
+      <div v-if="workflowOpen" class="wf-full">
+        <div class="wf-inner">
+          <WorkflowPanel
+            :initial-scope="wfScope"
+            @close="closeWorkflow()"
+            @goto="onGoto"
+          />
+        </div>
       </div>
-    </div>
+    </Transition>
 
   </div>
 </template>
@@ -533,11 +555,28 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 .kv span { color: var(--text-3); width: 76px; flex: 0 0 76px; }
 .kv b { font-weight: var(--fw-strong); }
 
-.wf-sheet {
-  width: min(780px, 100%); align-self: stretch; min-height: 0;
-  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-4);
-  box-shadow: var(--shadow-3); overflow: hidden;
-  animation: slide var(--dur-4) var(--ease-out);
+.wf-full {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  padding-top: var(--safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.wf-inner { width: 100%; max-width: 880px; margin: 0 auto; flex: 1; min-height: 0; }
+.wf-enter-active, .wf-leave-active {
+  transition: transform var(--dur-4) var(--ease-out), opacity var(--dur-3) var(--ease-out);
+}
+.wf-enter-from, .wf-leave-to { transform: translateX(28px); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .wf-enter-active, .wf-leave-active { transition-duration: 190ms; }
+}
+html[data-motion='off'] .wf-enter-active,
+html[data-motion='off'] .wf-leave-active { transition: none; }
+
+@media (max-width: 640px) {
+  .wf-inner { max-width: none; }
 }
 .todo { display: flex; align-items: center; gap: var(--sp-2); padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .todo:last-child { border-bottom: none; }
@@ -564,9 +603,9 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 .rpt-tile.s-confirmed .rpt-tile-val { color: var(--ok); }
 
 .req-text {
-  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);
-  white-space: pre-wrap; word-break: break-word; margin: 0;
-  line-height: 1.7; max-height: 220px; overflow-y: auto;
+  font-size: var(--fs-1); color: var(--text-2);
+  line-height: 1.75; max-height: 240px; overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* 导出 */
@@ -619,40 +658,6 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 .run-steps li.failed .rs-dot { background: var(--danger); }
 .rs-label { flex: 1; min-width: 0; }
 .rs-note { font-size: 11px; opacity: 0.8; }
-
-.drawer-scrim {
-  position: fixed; inset: 0; z-index: 60;
-  background: rgba(12, 13, 16, 0.46);
-  display: flex; justify-content: flex-end;
-  /* 状态栏下不能再盖内容：上下都按实测安全区留白 */
-  padding: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 8px) 8px
-    calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 8px);
-  box-sizing: border-box;
-  animation: scrim var(--dur-2) var(--ease-out);
-}
-.drawer {
-  width: min(560px, 100%); height: 100%;
-  display: flex; flex-direction: column;
-  background: var(--bg);
-  border: 1px solid var(--line); border-radius: var(--r-4);
-  box-shadow: var(--shadow-3);
-  animation: slide var(--dur-4) var(--ease-out);
-}
-@keyframes scrim { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slide { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
-.drawer-head { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); }
-.x { background: none; border: none; color: var(--text-3); font-size: 22px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%; }
-.x:hover { background: var(--surface-2); color: var(--text); }
-.drawer-body { flex: 1; overflow-y: auto; padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
-.empty { color: var(--text-3); font-size: var(--fs-2); }
-.msg { display: flex; }
-.msg.user { justify-content: flex-end; }
-.msg-body {
-  padding: 10px 14px; border-radius: var(--r-2); font-size: var(--fs-2); line-height: 1.75;
-  background: var(--surface-2); max-width: 88%; white-space: pre-wrap; word-break: break-word;
-}
-.msg.user .msg-body { background: var(--primary-soft); }
-.drawer-foot { display: flex; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--line); }
 
 @media (max-width: 860px) {
   .phead { padding: var(--sp-3) var(--sp-4) var(--sp-2); }

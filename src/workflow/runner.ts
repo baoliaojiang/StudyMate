@@ -228,6 +228,17 @@ export const useWorkflowStore = defineStore('workflow', () => {
     if (!run.value) return;
     const i = index >= 0 ? index : run.value.steps.findIndex((s) => s.status === 'failed');
     if (i < 0) return;
+
+    // 预算上限是钱，不能替用户加；调用次数是本地限制，可以自动放宽
+    if (run.value.maxCost > 0 && run.value.cost >= run.value.maxCost) {
+      app.toast('已达预算上限，请到「设置 → 模型与检索」调高预算后再重试', 'warn', 5200);
+      return;
+    }
+    if (run.value.calls >= run.value.maxCalls) {
+      const next = run.value.calls + Math.max(4, Math.ceil(run.value.maxCalls / 2));
+      run.value.maxCalls = next;
+      app.toast(`已达调用上限，已自动放宽到 ${next} 次，接着重试`, 'info', 4200);
+    }
     run.value.steps[i] = { ...run.value.steps[i], status: 'pending', error: undefined, warnings: [] };
     run.value.current = i;
     run.value.status = 'running';

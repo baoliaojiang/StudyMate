@@ -155,7 +155,19 @@ electron/      桌面主进程
 
 - 问题与建议：[Issues](https://github.com/baoliaojiang/StudyMate/issues)
 - QQ 群：1134731856
-- 许可证：[MIT](LICENSE)（说明见 [docs/license-note.md](docs/license-note.md)）
+- 许可证：[MIT + 署名要求](LICENSE)（说明见 [docs/license-note.md](docs/license-note.md)）
 - 作者主页：<https://github.com/baoliaojiang>
+
+### 关于二次分发
+
+可以转发、可以改、可以商用、可以改名，不需要事先取得授权，也不需要付费。唯一的要求是署名：分发的版本里要保留下面这条信息，并且放在软件内使用者能点到的位置（例如「设置 → 关于」），不能只写在安装包说明或源码注释里。
+
+```
+本项目基于 研学帮 StudyMate 修改
+原作者：baoliaojiang
+原项目：https://github.com/baoliaojiang/StudyMate
+```
+
+二次分发的版本请注明「本版本由 …… 基于 StudyMate 修改」，不要让人误以为这是原作者的官方版本。
 
 版本说明、更新日志与检查更新入口都在应用内；发布记录见 [Releases](https://github.com/baoliaojiang/StudyMate/releases)。

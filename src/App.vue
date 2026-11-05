@@ -8,6 +8,7 @@ import ModelPicker from './components/ModelPicker.vue';
 import SideNav from './components/SideNav.vue';
 import GlobalConfirm from './components/GlobalConfirm.vue';
 import { bypassLeaveOnce, closeTopOverlay, confirmLeave, pushOverlay } from './core/task-guard';
+import { skipRateLimitWait } from './ai/http';
 
 const app = useAppStore();
 const projects = useProjectStore();
@@ -96,15 +97,41 @@ const subLabel = computed(
     })[subTab.value] ?? '',
 );
 
-/** 限流只提示，不暂停：等待与重试都在网络层自己做完了 */
+/**
+ * 限流：默认等满 60 秒自动重试，同时给一个「立即重试」按钮。
+ * 有些服务商只是短时抖动，用户不想干等就走手动；自动重试仍然保留。
+ */
+const rateLimitLeft = ref(0);
+let rateLimitTimer: number | undefined;
+
+function stopRateTimer() {
+  window.clearInterval(rateLimitTimer);
+  rateLimitTimer = undefined;
+}
+
 function onRateLimit(e: Event) {
   const ms = Number((e as CustomEvent<{ waitMs?: number }>).detail?.waitMs ?? 60000);
-  const sec = Math.round(ms / 1000);
-  app.toast(`模型服务限流，已自动排队，约 ${sec} 秒后重试；当前流程不会中断`, 'warn', 6000);
+  rateLimitLeft.value = Math.max(1, Math.round(ms / 1000));
+  stopRateTimer();
+  rateLimitTimer = window.setInterval(() => {
+    rateLimitLeft.value = Math.max(0, rateLimitLeft.value - 1);
+    if (rateLimitLeft.value <= 0) stopRateTimer();
+  }, 1000);
+  app.toast('模型服务限流，已自动排队；也可以点顶部提示里的「立即重试」', 'warn', 6000);
+}
+
+function retryNow() {
+  skipRateLimitWait();
+  rateLimitLeft.value = 0;
+  stopRateTimer();
+  app.toast('已跳过等待，正在立即重试', 'info', 2600);
 }
 
 onMounted(() => window.addEventListener('studymate:ratelimit', onRateLimit));
-onBeforeUnmount(() => window.removeEventListener('studymate:ratelimit', onRateLimit));
+onBeforeUnmount(() => {
+  window.removeEventListener('studymate:ratelimit', onRateLimit);
+  stopRateTimer();
+});
 
 /**
  * 未成年人模式的每日使用提醒
@@ -250,7 +277,8 @@ const themeLabel = computed(() =>
           <span v-html="NAV_ICONS.menu" />
         </button>
 
-        <ModelPicker class="only-mobile" />
+        <!-- 选模型常驻：手机与电脑都能随时切换，不用先进设置 -->
+        <ModelPicker />
 
         <div class="nav-arrows only-desktop">
           <button class="icon-btn ghost" aria-label="后退" @click="router.back()"><span v-html="NAV_ICONS.back" /></button>
@@ -268,6 +296,11 @@ const themeLabel = computed(() =>
           <span v-html="NAV_ICONS.bell" />
         </button>
       </header>
+
+      <div v-if="rateLimitLeft > 0" class="rate-banner" role="status">
+        <span>模型服务限流，约 {{ rateLimitLeft }} 秒后自动重试；当前流程不会中断。</span>
+        <button class="btn btn-sm" type="button" @click="retryNow">立即重试</button>
+      </div>
 
       <main class="content">
         <router-view v-slot="{ Component }">
@@ -311,6 +344,15 @@ const themeLabel = computed(() =>
 
 /* ================= 主区 ================= */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; }
+.rate-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  background: var(--warn-soft, rgba(214, 158, 46, 0.14));
+  color: var(--text);
+  font-size: 12px; line-height: 1.6;
+}
+.rate-banner span { flex: 1; min-width: 0; }
+.rate-banner .btn { flex: 0 0 auto; }
 .topbar {
   height: var(--nav-h);
   flex: 0 0 var(--nav-h);

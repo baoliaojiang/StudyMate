@@ -479,6 +479,14 @@ const { copied: feedbackCopied, copy: copyText } = useCopyFeedback();
 
 /** 反馈不走邮箱：统一进 QQ 群，公告与版本都在群里说 */
 const QQ_GROUP = '1134731856';
+const AUTHOR = 'baoliaojiang';
+const CREDIT = `本项目基于 研学帮 StudyMate 修改\n原作者：${AUTHOR}\n原项目：${SITE.github}`;
+const { copied: creditCopied, copy: copyCreditText } = useCopyFeedback();
+async function copyCredit() {
+  const ok = await copyCreditText(CREDIT);
+  app.toast(ok ? '署名块已复制，贴到你的制作人员名单里' : '复制失败，手动写一下：' + SITE.github, ok ? 'ok' : 'warn', 3600);
+}
+
 async function copyGroup() {
   const ok = await copyText(QQ_GROUP);
   app.toast(ok ? `群号 ${QQ_GROUP} 已复制，去 QQ 搜索加入` : '复制失败，手动记一下：' + QQ_GROUP, ok ? 'ok' : 'warn', 3600);
@@ -581,6 +589,18 @@ async function sendFeedback() {
           <span class="ver-tap" role="button" tabindex="0" title="版本号也能点" @click="tapVersion" @keyup.enter="tapVersion">v{{ VERSION }} · MIT License</span>
         </div>
       </div>
+      <SettingGroup title="制作人员">
+        <SettingRow label="作者" :value="AUTHOR" />
+        <SettingRow label="项目仓库" :value="hostOf(SITE.github)" chevron @click="openLink(SITE.github, true)" />
+        <SettingRow label="许可" value="MIT + 署名要求" chevron @click="router.push('/legal/license')" />
+      </SettingGroup>
+      <p class="note">
+        允许二次分发与修改，唯一的附加要求是署名：分发时在软件里保留上面这条项目仓库入口和作者信息，别删、别藏。
+        <button class="inline-btn" type="button" @click="copyCredit">
+          {{ creditCopied ? '已复制署名块' : '复制署名块' }}
+        </button>
+      </p>
+
       <SettingGroup title="声明">
         <div class="legal">
           <p>{{ DISCLAIMER_TEXT }}</p>
@@ -786,6 +806,14 @@ async function sendFeedback() {
 .textarea { width: 100%; }
 
 .about-head { display: flex; align-items: center; gap: 14px; padding: 8px 4px 22px; }
+.inline-btn {
+  display: inline; margin-left: 4px; padding: 1px 8px;
+  border: none; border-radius: var(--r-full);
+  background: var(--surface-2); color: var(--primary);
+  font-size: inherit; font-family: inherit; cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out);
+}
+.inline-btn:hover { background: var(--surface-3); }
 .logo { width: 54px; height: 54px; border-radius: 14px; }
 .about-head b { display: block; font-size: 17px; }
 .about-head span { font-size: 11.5px; color: var(--text-3); }

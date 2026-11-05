@@ -99,7 +99,7 @@ export async function fetchJson<T>(url: string, opts: FetchJsonOptions): Promise
               detail,
               true,
             );
-            await sleep(RATE_LIMIT_WAIT_MS, opts.signal);
+            await rateLimitSleep(RATE_LIMIT_WAIT_MS, opts.signal);
             continue;
           }
         }
@@ -223,7 +223,7 @@ export async function fetchSse(
           notifyRateLimit(RATE_LIMIT_WAIT_MS);
           if (attempt < Math.max(1, opts.retriesBeforeFirstChunk ?? 1)) {
             attempt++;
-            await sleep(RATE_LIMIT_WAIT_MS, opts.signal);
+            await rateLimitSleep(RATE_LIMIT_WAIT_MS, opts.signal);
             continue;
           }
         }
@@ -311,6 +311,32 @@ function describeStatus(status: number): string {  switch (status) {
     default:
       return `请求失败（${status}）`;
   }
+}
+
+let skipRateWait = false;
+
+/** 用户在限流提示里点「立即重试」：让当前这一次等待提前结束 */
+export function skipRateLimitWait() {
+  skipRateWait = true;
+}
+
+/**
+ * 限流等待：默认等满 60 秒后自动重试，用户也可以点「立即重试」提前放行。
+ * 每 400ms 醒一次，既省电，又能及时响应手动重试与取消。
+ */
+async function rateLimitSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (signal?.aborted) {
+      throw new ProviderError('请求已取消或超时', undefined, undefined, true);
+    }
+    if (skipRateWait) {
+      skipRateWait = false;
+      return;
+    }
+    await sleep(Math.min(400, Math.max(0, end - Date.now())), signal);
+  }
+  skipRateWait = false;
 }
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {

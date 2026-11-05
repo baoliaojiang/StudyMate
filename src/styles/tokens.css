@@ -22,13 +22,14 @@
   --font-serif: 'HarmonyOS Sans SC', 'Source Han Serif SC', 'Songti SC', serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 
-  /* 字阶：比例 1.25，6 级 */
-  --fs-1: 12.5px; /* 元信息、单位 */
-  --fs-2: 15px; /* 正文 */
-  --fs-3: 17px; /* 卡片标题 */
-  --fs-4: 21px; /* 区块标题 */
-  --fs-5: 27px; /* 次级展示 */
-  --fs-6: 34px; /* 展示（一屏一处） */
+  /* 字阶：比例 1.25，6 级；--font-scale 由设置里的「字体大小」控制 */
+  --font-scale: 1;
+  --fs-1: calc(12.5px * var(--font-scale)); /* 元信息、单位 */
+  --fs-2: calc(15px * var(--font-scale)); /* 正文 */
+  --fs-3: calc(17px * var(--font-scale)); /* 卡片标题 */
+  --fs-4: calc(21px * var(--font-scale)); /* 区块标题 */
+  --fs-5: calc(27px * var(--font-scale)); /* 次级展示 */
+  --fs-6: calc(34px * var(--font-scale)); /* 展示（一屏一处） */
 
   --lh-1: 1.15; /* 展示 */
   --lh-2: 1.35; /* 标题 */

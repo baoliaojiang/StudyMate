@@ -60,6 +60,12 @@ export const useAppStore = defineStore('app', () => {
     document.documentElement.setAttribute('data-font', settings.value.font ?? 'harmony');
   }
 
+  /** 字体大小：改 --font-scale，全站字阶按比例缩放，不用逐个组件改 */
+  function applyFontScale() {
+    const s = Math.max(0.85, Math.min(1.3, Number(settings.value.fontScale) || 1));
+    document.documentElement.style.setProperty('--font-scale', String(s));
+  }
+
   /**
    * 状态栏留白 = 实测安全区 + 用户手动补的像素。
    * 有些机型（尤其 targetSdk 36 的安卓 WebView）env() 直接给 0，
@@ -116,6 +122,7 @@ export const useAppStore = defineStore('app', () => {
     applyTheme();
     applyMotion();
     applyFont();
+    applyFontScale();
     applySafeArea();
     // 通用技能（如「Markdown 杀手」）对所有 Agent 生效：这里同步一次
     setGlobalExtraSkills(settings.value.enabledSkills ?? []);
@@ -128,6 +135,7 @@ export const useAppStore = defineStore('app', () => {
     applyTheme();
     applyMotion();
     applyFont();
+    applyFontScale();
     applySafeArea();
     setGlobalExtraSkills(settings.value.enabledSkills ?? []);
   }

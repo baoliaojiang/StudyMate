@@ -181,6 +181,8 @@ async function regenerate() {
 
 const editing = ref(false);
 const editText = ref('');
+/** 默认只读预览上一步产出（Markdown），点「修改内容」才进编辑 */
+const previewText = computed(() => editTarget.value?.output?.trim() ?? '');
 function openEditor() {
   const t = editTarget.value;
   if (!t) {
@@ -322,11 +324,26 @@ const pct = computed(() => wf.progress);
             </button>
           </div>
 
+          <!-- 默认把上一步产出读出来：只有点「修改内容」才进入编辑 -->
+          <div v-if="!editing && previewText" class="await-preview">
+            <div class="await-preview-head">
+              <span>上一步产出 · {{ editTarget?.name }}</span>
+              <span class="muted small">只读，点「修改内容」才能改</span>
+            </div>
+            <div class="await-preview-body">
+              <MarkdownText :text="previewText" />
+            </div>
+          </div>
+
           <div v-if="editing" class="edit-area">
             <p class="edit-hint">
               改的是「{{ editTarget?.name }}」的产出。保存后按你的版本继续，AI 不会替你核实改动。
             </p>
             <textarea v-model="editText" class="textarea" rows="8" />
+            <div v-if="editText.trim()" class="edit-preview">
+              <div class="edit-preview-label">预览</div>
+              <MarkdownText :text="editText" />
+            </div>
             <div class="edit-actions">
               <button class="btn btn-sm" type="button" @click="editing = false">取消</button>
               <button class="btn btn-sm btn-primary" type="button" @click="saveAndConfirm">改完并确认</button>
@@ -486,7 +503,28 @@ const pct = computed(() => wf.progress);
 .await-t { font-size: var(--fs-2); font-weight: var(--fw-strong); }
 .await-d { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
 .await-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.await-preview { width: 100%; margin-top: var(--sp-2); }
+.await-preview-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-bottom: 6px; font-size: 11.5px; color: var(--text-3);
+}
+.await-preview-body {
+  padding: 10px 12px; border-radius: var(--r-2);
+  background: var(--surface-2);
+  font-size: 12.5px; line-height: 1.8;
+  max-height: 300px; overflow-y: auto;
+}
 .edit-area { width: 100%; margin-top: var(--sp-2); }
+.edit-preview {
+  margin-top: 10px; padding: 10px 12px;
+  border-radius: var(--r-2); background: var(--surface-2);
+  font-size: 12.5px; line-height: 1.8;
+  max-height: 260px; overflow-y: auto;
+}
+.edit-preview-label {
+  margin-bottom: 6px; font-size: 10.5px; color: var(--text-3);
+  letter-spacing: 0.04em;
+}
 .edit-hint { margin: 0 0 8px; font-size: 11.5px; line-height: 1.7; color: var(--text-3); }
 .edit-area .textarea { width: 100%; min-height: 160px; resize: vertical; box-sizing: border-box; }
 .edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
