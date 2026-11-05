@@ -688,12 +688,10 @@ export interface CatalogConfig {
 }
 
 export interface UpdateConfig {
-  /** GitHub owner/repo 占位，由维护者填写 */
+  /** GitHub 仓库地址，检查更新与反馈都指向这里 */
   githubRepo: string;
-  /** 更新源镜像站列表：检查更新时依次探测，哪个可达用哪个 */
+  /** GitHub 反代镜像根地址：检查更新时全部并行探测，不用你一个个试 */
   mirrors: string[];
-  /** 备用下载（夸克网盘）链接占位 */
-  quarkUrl: string;
   /** 爱发电链接占位 */
   afdianUrl: string;
 }

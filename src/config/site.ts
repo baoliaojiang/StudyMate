@@ -8,7 +8,8 @@
  * 维护者清单：
  *  - 作者主页（GitHub）、B 站主页、爱发电：已填
  *  - 在线版（GitHub Pages）、GitHub 仓库 / Releases / Issue：已填
- *  - 夸克备用下载 / API 指引配置 / 更新 JSON：待维护者补充
+ *  - GitHub 反代镜像：只用于打开 Releases，版本号仍走官方接口
+ *  - API 指引配置 / 更新 JSON：待维护者补充
  */
 export const SITE = {
   appName: '研学帮 StudyMate',
@@ -32,8 +33,13 @@ export const SITE = {
   /** 爱发电（已填） */
   afdian: 'https://afdian.com/a/dcr33550336',
 
+  /**
+   * 常用 GitHub 反代镜像（根地址）。检查更新时会全部并行探测一遍，
+   * 只用于打开 Releases 页面；版本号仍以 GitHub 官方接口为准。
+   */
+  mirrors: ['https://ghproxy.net/', 'https://gh-proxy.com/', 'https://ghfast.top/'],
+
   /** 以下待维护者补充，空串表示未配置 */
-  quark: '', // 夸克备用下载分享链接
   apiGuide: '', // 免费 API 指引配置文件地址
   updateJson: '', // 更新 JSON 地址
 } as const;
@@ -56,6 +62,5 @@ export function externalLinks(): SiteLink[] {
     { key: 'bilibili', label: 'B 站主页', url: SITE.bilibili, ok: !!SITE.bilibili },
     { key: 'afdian', label: '爱发电（自愿支持）', url: SITE.afdian, ok: !!SITE.afdian },
     { key: 'issues', label: '提交 Issue / 反馈', url: SITE.issues, ok: !!SITE.issues },
-    { key: 'quark', label: '夸克备用下载', url: SITE.quark, ok: !!SITE.quark },
   ];
 }

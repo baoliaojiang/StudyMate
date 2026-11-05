@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   compareVersions,
   fetchLatestRelease,
+  mirrorTarget,
+  probeUpdateSources,
   releaseApiUrl,
 } from '../src/core/update-mirror';
 
@@ -61,5 +63,39 @@ describe('GitHub Releases 版本查询', () => {
   it('没有 html_url 时回退到仓库的 Releases 页面', async () => {
     const info = await fetchLatestRelease(REPO, mockFetch({ tag_name: '1.0.12' }));
     expect(info?.htmlUrl).toBe(`${REPO}/releases`);
+  });
+
+  it('官方与全部镜像都探测一遍，不是试到第一个可达就停', async () => {
+    const seen: string[] = [];
+    const stub = vi.fn(async (url: unknown) => {
+      seen.push(String(url));
+      return {} as Response;
+    });
+    vi.stubGlobal('fetch', stub);
+    try {
+      const list = await probeUpdateSources(
+        ['https://m1.example/', 'https://m2.example/'],
+        REPO,
+      );
+      expect(seen).toHaveLength(3);
+      expect(list.map((p) => p.via)).toEqual(['repo', 'mirror', 'mirror']);
+      expect(list.map((p) => p.host)).toEqual([
+        'github.com/baoliaojiang/StudyMate',
+        'm1.example',
+        'm2.example',
+      ]);
+      expect(list.every((p) => p.ok)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('镜像按「前缀/原地址」拼下载页', () => {
+    expect(mirrorTarget('https://ghproxy.net/', 'https://github.com/a/b/releases')).toBe(
+      'https://ghproxy.net/https://github.com/a/b/releases',
+    );
+    expect(mirrorTarget('https://ghproxy.net', 'https://github.com/a/b')).toBe(
+      'https://ghproxy.net/https://github.com/a/b',
+    );
   });
 });

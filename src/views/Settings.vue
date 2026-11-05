@@ -580,7 +580,8 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
           <SettingRow label="帮助中心" chevron @click="go('help')">
             <template #icon><AppIcon name="help" /></template>
           </SettingRow>
-          <SettingRow v-if="showSupport" label="反馈问题" chevron @click="go('feedback')">
+          <!-- 未成年人模式也允许反馈与检查更新，只隐藏娱乐/赞助类外链 -->
+          <SettingRow label="反馈问题" chevron @click="go('feedback')">
             <template #icon><AppIcon name="feedback" /></template>
           </SettingRow>
           <SettingRow label="其他设置" note="关于、更新、协议、重新引导、开发者选项" chevron @click="go('other')">

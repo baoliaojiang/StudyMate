@@ -1,4 +1,5 @@
 import { DEFAULT_SEARCH_PROVIDERS } from '../search/presets';
+import { SITE } from '../config/site';
 import type { AppSettings } from './types';
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -48,9 +49,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   update: {
     // 官方仓库：检查更新与提交 Issue 都指向这里
     githubRepo: 'https://github.com/baoliaojiang/StudyMate',
-    // 镜像站：检查更新前依次探测可达性，不可达自动跳过；留空则直接看 githubRepo
-    mirrors: [],
-    quarkUrl: '',
+    // 镜像站：检查更新时全部并行探测一遍，任意一个可达就能打开下载页
+    mirrors: [...SITE.mirrors],
     afdianUrl: 'https://afdian.com/a/dcr33550336',
   },
   profile: {

@@ -9,7 +9,14 @@ import { AI_NOTICE_TEXT, DISCLAIMER_TEXT, SIMULATED_TEXT } from '../../core/sett
 import { TEMPLATE_NOTE } from '../../core/settings';
 import { SITE, externalLinks } from '../../config/site';
 import { openExternal } from '../../core/shell';
-import { resolveUpdateSource, fetchLatestRelease, compareVersions, hostOf } from '../../core/update-mirror';
+import {
+  probeUpdateSources,
+  mirrorTarget,
+  fetchLatestRelease,
+  compareVersions,
+  hostOf,
+  type UpdateProbe,
+} from '../../core/update-mirror';
 import SettingGroup from '../../components/settings/SettingGroup.vue';
 import SettingRow from '../../components/settings/SettingRow.vue';
 import SubPage from '../../components/settings/SubPage.vue';
@@ -25,16 +32,24 @@ function back() {
 }
 
 const VERSION = SITE.version;
-/** 未成年人模式且隐藏外链时，关于页的外链一条都不列 */
-const links = computed(() => {
-  const minor = app.settings.minor;
-  return minor.enabled && minor.hideExternal ? [] : externalLinks();
+const minorHide = computed(() => {
+  const m = app.settings.minor;
+  return m.enabled && m.hideExternal;
 });
-/** 未成年人模式隐藏外链时，检查更新页与反馈页的链接也一起挡住 */
-function openLink(url: string) {
-  const minor = app.settings.minor;
-  if (minor.enabled && minor.hideExternal) {
-    app.toast('未成年人模式已隐藏外部链接', 'info');
+/**
+ * 未成年人模式仍保留「反馈」与「检查更新」两条通道：
+ * 在线版、仓库、Releases、Issues 照常可用；B 站、爱发电、作者主页这类才隐藏。
+ */
+const MINOR_KEEP = ['online', 'github', 'releases', 'issues'];
+const links = computed(() => {
+  const all = externalLinks();
+  return minorHide.value ? all.filter((l) => MINOR_KEEP.includes(l.key)) : all;
+});
+
+/** force 用于检查更新页的镜像与下载地址：那是用户明确要的更新通道，不受外链限制 */
+function openLink(url: string, force = false) {
+  if (!force && minorHide.value) {
+    app.toast('未成年人模式已隐藏该外链；反馈与检查更新仍可使用', 'info');
     return;
   }
   openExternal(url);
@@ -379,16 +394,22 @@ const updateState = ref<UpdateState>('idle');
 
 const update = computed(() => app.settings.update);
 
-/** 检查更新后探测到的可用源地址（含协议），未探测或都连不上为 null */
-const reachedSource = ref<string | null>(null);
-const reachedVia = ref<'mirror' | 'repo' | null>(null);
+/** 本次检查把官方与全部镜像都试了一遍，逐条留下结果 */
+const probes = ref<UpdateProbe[]>([]);
+const checkDone = ref(false);
 /** GitHub Releases 上真实存在的最新版本；读不到为 null */
 const latestRelease = ref<Awaited<ReturnType<typeof fetchLatestRelease>>>(null);
 const releaseReadable = ref(true);
 
 const sourceText = computed(() => {
-  if (!reachedSource.value) return '尚未检查';
-  return reachedVia.value === 'mirror' ? `镜像站可达 · ${hostOf(reachedSource.value)}` : `GitHub 官方可达 · ${hostOf(reachedSource.value)}`;
+  if (!checkDone.value) return '检查后显示';
+  const ok = probes.value.filter((p) => p.ok);
+  if (!ok.length) return '全部通道都连不上';
+  const official = ok.some((p) => p.via === 'repo');
+  const mirrors = ok.filter((p) => p.via === 'mirror').length;
+  if (official && mirrors) return `官方可达 · 另 ${mirrors} 个镜像可用`;
+  if (official) return '仅 GitHub 官方可达';
+  return `${mirrors} 个镜像可用`;
 });
 
 const latestText = computed(() => {
@@ -406,8 +427,8 @@ const releaseDateText = computed(() => {
 
 async function checkUpdate() {
   updateState.value = 'checking';
-  reachedSource.value = null;
-  reachedVia.value = null;
+  probes.value = [];
+  checkDone.value = false;
   latestRelease.value = null;
   releaseReadable.value = true;
   // 没有配置任何更新源时，如实说明，不去连不存在的地址
@@ -416,19 +437,20 @@ async function checkUpdate() {
     app.toast('还没有可用的更新源，先到「其他设置」里配置', 'warn', 4000);
     return;
   }
-  // 可达性探测与版本查询并行；两者互不冒充，读不到版本也仍可打开下载页
-  const [src, rel] = await Promise.all([
-    resolveUpdateSource(update.value.mirrors, update.value.githubRepo),
+  // 官方 + 全部镜像并行探测（都试一遍），同时查 Releases；两者互不冒充
+  const [list, rel] = await Promise.all([
+    probeUpdateSources(update.value.mirrors, update.value.githubRepo),
     fetchLatestRelease(update.value.githubRepo),
   ]);
-  reachedSource.value = src.url;
-  reachedVia.value = src.via;
+  probes.value = list;
+  checkDone.value = true;
   latestRelease.value = rel;
+  const anyOk = list.some((p) => p.ok);
   if (!rel) {
     releaseReadable.value = false;
-    updateState.value = src.url ? 'unreachable' : 'none';
+    updateState.value = anyOk ? 'unreachable' : 'none';
     app.toast(
-      src.url ? '源可达，但暂时读不到发布信息，可以直接打开下载页' : '暂时连不上更新源，请检查网络后重试',
+      anyOk ? '通道可达，但暂时读不到发布信息，可以直接打开下载页' : '暂时连不上更新源，请检查网络后重试',
       'warn',
       4200,
     );
@@ -442,9 +464,15 @@ async function checkUpdate() {
   );
 }
 
+/** 官方直接开 Releases；镜像按「前缀/https://github.com/...」拼接 */
+function openProbe(p: UpdateProbe) {
+  const url = p.via === 'repo' ? SITE.releases : mirrorTarget(p.url, SITE.releases);
+  openLink(url, true);
+}
+
 function openRelease() {
   const url = latestRelease.value?.htmlUrl || SITE.releases;
-  openLink(url);
+  openLink(url, true);
 }
 
 const { copied: feedbackCopied, copy: copyText } = useCopyFeedback();
@@ -523,9 +551,10 @@ async function sendFeedback() {
           label="提交到 GitHub Issue"
           :value="update.githubRepo ? hostOf(update.githubRepo) : '待补充'"
           :chevron="!!update.githubRepo"
-          @click="update.githubRepo && openLink(update.githubRepo + '/issues')"
+          @click="update.githubRepo && openLink(update.githubRepo + '/issues', true)"
         />
         <SettingRow
+          v-if="!minorHide"
           label="作者主页"
           :value="SITE.authorHome.replace(/^https?:\/\//, '')"
           chevron
@@ -566,7 +595,7 @@ async function sendFeedback() {
           :label="l.label"
           :value="l.ok ? l.url.replace(/^https?:\/\//, '') : '待补充'"
           :chevron="l.ok"
-          @click="l.ok && openLink(l.url)"
+          @click="l.ok && openLink(l.url, MINOR_KEEP.includes(l.key))"
         />
         <SettingRow
           :label="`QQ 群：${QQ_GROUP}`"
@@ -615,25 +644,37 @@ async function sendFeedback() {
       </div>
       <p v-else-if="updateState === 'up-to-date'" class="upd-ok">当前已是最新版本。</p>
 
+      <SettingGroup v-if="probes.length" title="更新通道（都试过一遍）">
+        <SettingRow
+          v-for="p in probes"
+          :key="p.url"
+          :label="p.via === 'repo' ? 'GitHub 官方' : '镜像站'"
+          :value="`${p.host} · ${p.ok ? '可达' : '不可达'}`"
+          :chevron="p.ok"
+          @click="p.ok && openProbe(p)"
+        />
+      </SettingGroup>
+
       <SettingGroup title="其他入口">
-        <SettingRow label="在线版（免安装）" :value="hostOf(SITE.online)" chevron @click="openLink(SITE.online)" />
+        <SettingRow label="在线版（免安装）" :value="hostOf(SITE.online)" chevron @click="openLink(SITE.online, true)" />
         <SettingRow
           label="GitHub 仓库"
           :value="update.githubRepo ? hostOf(update.githubRepo) : '待补充'"
           :chevron="!!update.githubRepo"
-          @click="update.githubRepo && openLink(update.githubRepo)"
+          @click="update.githubRepo && openLink(update.githubRepo, true)"
         />
         <SettingRow
+          v-if="!minorHide"
           label="作者主页"
           :value="SITE.authorHome.replace(/^https?:\/\//, '')"
           chevron
           @click="openLink(SITE.authorHome)"
         />
         <SettingRow
-          label="夸克网盘（备用下载）"
-          :value="update.quarkUrl ? update.quarkUrl.replace(/^https?:\/\//, '') : '即将上线'"
-          :chevron="!!update.quarkUrl"
-          @click="update.quarkUrl && openLink(update.quarkUrl)"
+          :label="`QQ 群下载（${QQ_GROUP}）`"
+          value="复制群号，进群后在群文件下载"
+          chevron
+          @click="copyGroup"
         />
       </SettingGroup>
       <p class="note">
@@ -642,7 +683,7 @@ async function sendFeedback() {
             ? '正在检查可达的更新源与最新发布版本…'
             : updateState === 'unreachable' || updateState === 'none'
               ? '暂时读不到发布信息时，可以直接打开下载页查看。'
-              : '版本信息来自 GitHub Releases，只读取真实发布的版本号，不下载、不安装。'
+              : '检查时会把 GitHub 官方与全部镜像一起试一遍；版本号只认官方发布，不下载、不安装。'
         }}
       </p>
     </template>

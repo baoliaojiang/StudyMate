@@ -20,7 +20,7 @@ const PROBE_TIMEOUT_MS = 4500;
  */
 function probeUrl(url: string): Promise<boolean> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   return fetch(url, {
     method: 'GET',
     mode: 'no-cors',
@@ -29,7 +29,7 @@ function probeUrl(url: string): Promise<boolean> {
   })
     .then(() => true)
     .catch(() => false)
-    .finally(() => window.clearTimeout(timer));
+    .finally(() => clearTimeout(timer));
 }
 
 /**
@@ -53,24 +53,53 @@ export interface UpdateSource {
   via: UpdateSourceVia;
 }
 
+export interface UpdateProbe {
+  /** 被探测的地址（镜像是根地址） */
+  url: string;
+  host: string;
+  via: 'repo' | 'mirror';
+  ok: boolean;
+}
+
+/**
+ * 把所有通道都试一遍：官方仓库 + 全部镜像并行探测，不用一个个等。
+ * 返回顺序固定为「官方在前、镜像按配置顺序」，界面可以逐条显示可达状态。
+ */
+export async function probeUpdateSources(
+  mirrors: string[],
+  githubRepo?: string,
+): Promise<UpdateProbe[]> {
+  const targets: { url: string; via: 'repo' | 'mirror' }[] = [];
+  if (githubRepo) targets.push({ url: githubRepo, via: 'repo' });
+  for (const m of mirrors) if (m) targets.push({ url: m, via: 'mirror' });
+  if (!targets.length) return [];
+  return Promise.all(
+    targets.map(async (t) => ({ ...t, host: hostOf(t.url), ok: await probeUrl(t.url) })),
+  );
+}
+
+/** 镜像根地址 + 目标页面：ghproxy 系列都支持「前缀/https://github.com/...」 */
+export function mirrorTarget(mirror: string, target: string): string {
+  const base = mirror.endsWith('/') ? mirror : `${mirror}/`;
+  return `${base}${target}`;
+}
+
 /**
  * 选出可用更新源：优先 mirrors，回退 githubRepo。
+ * 只需要一个地址时用它；要在界面上列出全部通道时用 probeUpdateSources。
  */
 export async function resolveUpdateSource(
   mirrors: string[],
   githubRepo?: string,
 ): Promise<UpdateSource> {
-  const mirror = await probeMirrors(mirrors);
-  if (mirror) return { url: mirror, via: 'mirror' };
-  if (githubRepo && (await probeUrl(githubRepo))) {
-    return { url: githubRepo, via: 'repo' };
-  }
-  return { url: null, via: null };
+  const probes = await probeUpdateSources(mirrors, githubRepo);
+  const hit = probes.find((p) => p.via === 'mirror' && p.ok) ?? probes.find((p) => p.ok);
+  return hit ? { url: hit.url, via: hit.via } : { url: null, via: null };
 }
 
 /** 取地址的 host 用于界面展示（去掉协议头） */
 export function hostOf(url: string): string {
-  return url.replace(/^https?:\/\//, '');
+  return url.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
 
 /* ---------------------- GitHub Releases 版本查询 ---------------------- */

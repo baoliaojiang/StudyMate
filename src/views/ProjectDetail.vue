@@ -361,7 +361,7 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
           </button>
         </div>
         <div class="row wrap" style="margin-top: 12px">
-          <button class="btn btn-sm btn-primary" @click="router.push(`/deck/${p.id}`)">生成答辩 PPT</button>
+          <button class="btn btn-sm" type="button" @click="router.push(`/deck/${p.id}`)">答辩 PPT（可选）</button>
           <button class="btn btn-sm" type="button" @click="zipOpen = !zipOpen">打包下载（可选范围）</button>
           <button class="btn btn-sm" @click="doExport('md')">导出 Markdown</button>
           <button class="btn btn-sm" type="button" @click="runCheck">
@@ -403,7 +403,7 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
         </div>
         <p class="muted small" style="margin: 12px 0 0; line-height: 1.7">
           文档导出的是真正的 Office Open XML，含模拟内容时文首自动加提示框，正文保留「（AI 模拟示例）」标识。<br />
-          答辩 PPT 按项目内容逐页生成，可自己改文字与顺序，导出 PPTX 和讲稿。
+          答辩 PPT 按需生成，不做也不影响四份材料导出；「指导教师意见」留空即可，由老师本人填写。
         </p>
       </div>
 

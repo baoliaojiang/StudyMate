@@ -97,14 +97,15 @@ export const useAppStore = defineStore('app', () => {
      * 没有仓库名的路径），或者仓库还没发布时留了空值。现在仓库已经建好，
      * 这两种情况都补成官方地址；用户自己改过的地址保留。
      */
-    const repo = settings.value.update?.githubRepo ?? '';
-    if (!repo || /^https?:\/\/github\.com\/[^/]+\/?$/.test(repo)) {
-      settings.value.update = {
-        ...settings.value.update,
-        githubRepo: SITE.github,
-        mirrors: settings.value.update?.mirrors ?? [],
-      };
-    }
+    const up = settings.value.update;
+    const repo = up?.githubRepo ?? '';
+    settings.value.update = {
+      ...up,
+      githubRepo: !repo || /^https?:\/\/github\.com\/[^/]+\/?$/.test(repo) ? SITE.github : repo,
+      // 老版本把 mirrors 存成空数组：补上默认镜像，检查更新才能「都试一遍」
+      mirrors: up?.mirrors?.length ? up.mirrors : [...SITE.mirrors],
+      afdianUrl: up?.afdianUrl || DEFAULT_SETTINGS.update.afdianUrl,
+    };
     if (typeof window !== 'undefined') {
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', (e) => {
