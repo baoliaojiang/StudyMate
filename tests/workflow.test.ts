@@ -36,10 +36,11 @@ function report(kind: Report['kind'], opts: { body?: string; status?: Report['st
   } as unknown as Report;
 }
 
-function record(sourceType: StudyRecord['sourceType'], confirmed = true): StudyRecord {
+function record(sourceType: StudyRecord['sourceType'], confirmed = true, term: 1 | 2 = 1): StudyRecord {
   return {
     id: Math.random().toString(36).slice(2),
     content: 'x',
+    term,
     sourceType,
     confirmed,
   } as unknown as StudyRecord;
@@ -50,9 +51,9 @@ function record(sourceType: StudyRecord['sourceType'], confirmed = true): StudyR
 describe('标准研究流程', () => {
   const def: WorkflowDef = defaultWorkflow();
 
-  it('共 18 步，其中 5 个确认门、2 个记录守卫（上/下学期各一个）', () => {
-    expect(def.steps.length).toBe(18);
-    expect(def.steps.filter((s) => s.kind === 'gate').length).toBe(5);
+  it('共 22 步，其中 7 个确认门、2 个记录守卫（上/下学期各一个）', () => {
+    expect(def.steps.length).toBe(22);
+    expect(def.steps.filter((s) => s.kind === 'gate').length).toBe(7);
     expect(def.steps.filter((s) => s.id.startsWith('records-guard')).length).toBe(2);
     expect(def.steps.find((s) => s.id === 'records-guard-t1')?.term).toBe(1);
     expect(def.steps.find((s) => s.id === 'records-guard-t2')?.term).toBe(2);
@@ -74,10 +75,15 @@ describe('标准研究流程', () => {
     expect(ids.indexOf('final-review')).toBeLessThan(ids.indexOf('export'));
   });
 
-  it('上学期守卫紧跟在开题确认之后、下学期守卫紧跟中期审核之后', () => {
+  it('上学期：开题确认 → 起草记录 → 确认记录 → 核对；下学期同理跟在中期审核之后', () => {
     const ids = def.steps.map((s) => s.id);
-    expect(ids.indexOf('proposal-confirm')).toBe(ids.indexOf('records-guard-t1') - 1);
-    expect(ids.indexOf('midterm-review')).toBe(ids.indexOf('records-guard-t2') - 1);
+    const t1 = ids.indexOf('records-draft-t1');
+    expect(ids.indexOf('proposal-confirm')).toBe(t1 - 1);
+    expect(ids.slice(t1, t1 + 3)).toEqual(['records-draft-t1', 'records-confirm-t1', 'records-guard-t1']);
+
+    const t2 = ids.indexOf('records-draft-t2');
+    expect(ids.indexOf('midterm-review')).toBe(t2 - 1);
+    expect(ids.slice(t2, t2 + 3)).toEqual(['records-draft-t2', 'records-confirm-t2', 'records-guard-t2']);
   });
 });
 
@@ -169,5 +175,63 @@ describe('currentReportKind', () => {
     expect(
       currentReportKind([report('proposal', { status: 'confirmed' }), report('midterm', { status: 'confirmed' })]),
     ).toBe('final');
+  });
+});
+
+/**
+ * 回归：每个「记录守卫」前面必须真的有一支写入步骤。
+ * 之前只有守卫没有写入，新项目跑到第 12 步必然失败，工作流等于跑不起来。
+ */
+describe('过程记录必须能自己写出来', () => {
+  const ids = DEFAULT_STEPS.map((s) => s.id);
+
+  it('两个学期都先起草、再确认、最后核对', () => {
+    for (const term of [1, 2] as const) {
+      const draft = ids.indexOf(`records-draft-t${term}`);
+      const confirm = ids.indexOf(`records-confirm-t${term}`);
+      const guard = ids.indexOf(`records-guard-t${term}`);
+      expect(draft).toBeGreaterThanOrEqual(0);
+      expect(confirm).toBeGreaterThan(draft);
+      expect(guard).toBeGreaterThan(confirm);
+    }
+  });
+
+  it('起草步骤绑定了 Agent，且标注了学期', () => {
+    for (const term of [1, 2] as const) {
+      const s = DEFAULT_STEPS.find((x) => x.id === `records-draft-t${term}`)!;
+      expect(s.kind).toBe('records');
+      expect(s.term).toBe(term);
+      expect(!!s.agentId).toBe(true);
+    }
+  });
+
+  it('起草步骤排在中期报告之前，不会等写完中期才补记录', () => {
+    expect(ids.indexOf('records-draft-t1')).toBeLessThan(ids.indexOf('midterm-write'));
+    expect(ids.indexOf('records-draft-t2')).toBeLessThan(ids.indexOf('final-write'));
+  });
+
+  it('门与守卫都要求「已确认的真实记录」，草稿通过不了', () => {
+    for (const term of [1, 2] as const) {
+      const draftOnly = { project: project(), reports: [], records: [record('real', false, term)] };
+      const confirmed = { project: project(), reports: [], records: [record('real', true, term)] };
+      expect(stepCompleted(`records-confirm-t${term}`, draftOnly)).toBe(false);
+      expect(stepCompleted(`records-guard-t${term}`, draftOnly)).toBe(false);
+      expect(stepCompleted(`records-guard-t${term}`, confirmed)).toBe(true);
+    }
+  });
+
+  it('已经写了记录就算起草完成，不会重跑覆盖', () => {
+    const withRec = { project: project(), reports: [], records: [record('real', false, 1)] };
+    expect(stepCompleted('records-draft-t1', withRec)).toBe(true);
+    const otherTerm = { project: project(), reports: [], records: [record('real', false, 2)] };
+    expect(stepCompleted('records-draft-t1', otherTerm)).toBe(false);
+  });
+
+  it('步骤总数与说明一致（22 步 / 7 门 / 2 守卫）', () => {
+    const wf = defaultWorkflow();
+    expect(wf.steps).toHaveLength(22);
+    expect(wf.steps.filter((s) => s.kind === 'gate')).toHaveLength(7);
+    expect(wf.steps.filter((s) => s.kind === 'guard')).toHaveLength(2);
+    expect(wf.desc).toContain('22 步');
   });
 });

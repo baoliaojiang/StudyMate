@@ -480,7 +480,7 @@ const { copied: feedbackCopied, copy: copyText } = useCopyFeedback();
 /** 反馈不走邮箱：统一进 QQ 群，公告与版本都在群里说 */
 const QQ_GROUP = '1134731856';
 const AUTHOR = 'baoliaojiang';
-const CREDIT = `本项目基于 研学帮 StudyMate 修改\n原作者：${AUTHOR}\n原项目：${SITE.github}`;
+const CREDIT = `本项目基于 研学帮 StudyMate 修改\n原作者：${AUTHOR}\n原项目：${SITE.github}\n许可：学习免费，商用与对外分发需授权（QQ 群 1134731856）`;
 const { copied: creditCopied, copy: copyCreditText } = useCopyFeedback();
 async function copyCredit() {
   const ok = await copyCreditText(CREDIT);
@@ -586,16 +586,17 @@ async function sendFeedback() {
         <img src="/icon.svg" alt="" class="logo" />
         <div>
           <b>研学帮 StudyMate</b>
-          <span class="ver-tap" role="button" tabindex="0" title="版本号也能点" @click="tapVersion" @keyup.enter="tapVersion">v{{ VERSION }} · MIT License</span>
+          <span class="ver-tap" role="button" tabindex="0" title="版本号也能点" @click="tapVersion" @keyup.enter="tapVersion">v{{ VERSION }} · 使用许可</span>
         </div>
       </div>
       <SettingGroup title="制作人员">
         <SettingRow label="作者" :value="AUTHOR" />
         <SettingRow label="项目仓库" :value="hostOf(SITE.github)" chevron @click="openLink(SITE.github, true)" />
-        <SettingRow label="许可" value="MIT + 署名要求" chevron @click="router.push('/legal/license')" />
+        <SettingRow label="许可" value="学习免费 · 分发需授权" chevron @click="router.push('/legal/license')" />
       </SettingGroup>
       <p class="note">
-        允许二次分发与修改，唯一的附加要求是署名：分发时在软件里保留上面这条项目仓库入口和作者信息，别删、别藏。
+        学习、自己用、给自己学校用都免费。商业使用与对外二次分发，进 QQ 群 {{ QQ_GROUP }} 说明用途再拿授权；
+        免费适配本校的二次分发不用授权，但要保留上面这条作者与仓库入口，别删、别藏。
         <button class="inline-btn" type="button" @click="copyCredit">
           {{ creditCopied ? '已复制署名块' : '复制署名块' }}
         </button>

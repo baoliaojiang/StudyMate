@@ -22,6 +22,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.14',
+    date: '2026-11-06',
+    groups: [
+      {
+        title: '新增',
+        items: [
+          '过程记录可分批起草，不用一次写完',
+          '起草进度可见，写不完下次接着补',
+        ],
+      },
+      {
+        title: '修复',
+        items: [
+          '修复了推进到记录这一步就停住的问题',
+          '修复了部分步骤状态显示不准的问题',
+        ],
+      },
+      {
+        title: '优化',
+        items: [
+          '许可改为学习免费，商用与分发先授权',
+          '优化了本应用的性能，运行更流畅',
+          '优化了应用的稳定性，修复若干已知问题',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.0.13',
     date: '2026-11-06',
     groups: [

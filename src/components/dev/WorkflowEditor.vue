@@ -66,6 +66,7 @@ const KIND_LABEL: Record<WorkflowStepDef['kind'], string> = {
   agent: '模型',
   gate: '确认',
   guard: '守卫',
+  records: '记录草稿',
   manual: '手动',
 };
 

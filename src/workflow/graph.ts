@@ -151,8 +151,28 @@ export const DEFAULT_STEPS: WorkflowStepDef[] = [
     enabled: true,
   }),
   step({
-    id: 'records-guard-t1',
+    id: 'records-draft-t1',
     name: '上学期过程记录',
+    kind: 'records',
+    phase: 'write',
+    term: 1,
+    agentId: 'project-planner',
+    desc: '按计划分批起草上学期的活动记录：一次只写几篇，写完一批存一批，跑不完下次接着补',
+    enabled: true,
+  }),
+  step({
+    id: 'records-confirm-t1',
+    name: '确认上学期记录',
+    kind: 'gate',
+    phase: 'write',
+    term: 1,
+    desc: '草稿是「该做的事」，不是已经发生的事。逐篇改成真实时间、真实参与人、真实做法，再点确认',
+    requires: '每篇核对时间、参与人、做了什么、拿到什么；没做的改成没做，别硬凑',
+    enabled: true,
+  }),
+  step({
+    id: 'records-guard-t1',
+    name: '核对上学期记录',
     kind: 'guard',
     phase: 'write',
     term: 1,
@@ -181,8 +201,28 @@ export const DEFAULT_STEPS: WorkflowStepDef[] = [
     enabled: true,
   }),
   step({
-    id: 'records-guard-t2',
+    id: 'records-draft-t2',
     name: '下学期过程记录',
+    kind: 'records',
+    phase: 'write',
+    term: 2,
+    agentId: 'project-planner',
+    desc: '按计划分批起草下学期的活动记录，同样一次只写几篇',
+    enabled: true,
+  }),
+  step({
+    id: 'records-confirm-t2',
+    name: '确认下学期记录',
+    kind: 'gate',
+    phase: 'write',
+    term: 2,
+    desc: '逐篇改成真实发生的事，确认后才进结题',
+    requires: '每篇核对时间、参与人、做了什么、拿到什么',
+    enabled: true,
+  }),
+  step({
+    id: 'records-guard-t2',
+    name: '核对下学期记录',
     kind: 'guard',
     phase: 'write',
     term: 2,
@@ -226,7 +266,7 @@ export function defaultWorkflow(): WorkflowDef {
   return {
     id: WORKFLOW_ID,
     name: '标准研究流程',
-    desc: '从分析课题到导出 DOCX，共 17 步，含 5 个确认门与 1 个记录守卫',
+    desc: '从分析课题到导出 DOCX，共 22 步，含 7 个确认门与 2 个记录守卫',
     steps: DEFAULT_STEPS.map((s) => ({ ...s })),
     builtin: true,
     updatedAt: Date.now(),
@@ -263,6 +303,16 @@ export function stepCompleted(id: string, ctx: StepProgressContext): boolean {
     case 'proposal-review':
     case 'proposal-confirm':
       return confirmed('proposal');
+    case 'records-draft-t1':
+      return ctx.records.some((r) => r.term === 1);
+    case 'records-draft-t2':
+      return ctx.records.some((r) => r.term === 2);
+    case 'records-confirm-t1':
+    case 'records-guard-t1':
+      return realRecords.some((r) => r.term === 1);
+    case 'records-confirm-t2':
+    case 'records-guard-t2':
+      return realRecords.some((r) => r.term === 2);
     case 'records-guard':
       return realRecords.length > 0;
     case 'midterm-write':

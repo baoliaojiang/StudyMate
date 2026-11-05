@@ -10,7 +10,7 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { db } from '../core/db';
-import { uid } from '../core/id';
+import { todayISO, uid } from '../core/id';
 import type {
   Report,
   ReportKind,
@@ -20,6 +20,8 @@ import type {
   WorkflowScope,
   WorkflowStepDef,
   WorkflowActivity,
+  StudyRecord,
+  Term,
 } from '../core/types';
 import { useAppStore } from '../stores/app';
 import { useProjectStore } from '../stores/projects';
@@ -31,6 +33,7 @@ import { NON_AI_SECTIONS, templateFor } from '../reports/templates';
 import { runCombinedSearch } from '../search/providers';
 import { open_ } from '../core/crypto';
 import { defaultWorkflow, selectSteps, gateNeedsConfirm, WORKFLOW_ID } from './graph';
+import { batchCount, draftMessages, parseDrafts, termName, type DraftRecord } from './record-draft';
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -409,6 +412,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     if (sdef.kind === 'gate') return '等你确认';
     if (sdef.kind === 'manual') return '等你手动完成';
     if (sdef.kind === 'guard') return '正在核对真实记录…';
+    if (sdef.kind === 'records') return '正在分批起草这一学期的记录…';
     if (sdef.report) return '正在按章节整理答案…';
     return '正在调用模型，整理答案…';
   }
@@ -470,8 +474,11 @@ export const useWorkflowStore = defineStore('workflow', () => {
       const real = scope.filter((x) => x.confirmed && x.sourceType === 'real');
       const termName = term === 1 ? '上学期' : term === 2 ? '下学期' : '';
       if (!real.length) {
+        const drafted = scope.filter((x) => x.activityName.trim() || x.work.trim()).length;
         step.status = 'failed';
-        step.error = `没有${termName}真实开展并确认过的研究记录。这一步不往下走——先把${termName}的真实活动写进「过程记录」，确认后再继续。`;
+        step.error = drafted
+          ? `${termName}已经起草了 ${drafted} 篇，但都还是未确认状态。到「过程记录」逐篇核对时间、参与人、做了什么，点「确认真实」后再回来继续。`
+          : `还没有${termName}的记录。先跑前面的「${termName}过程记录」起草（分批写，写一批存一批），或自己到「过程记录」写一篇并确认为真实。`;
         step.endedAt = Date.now();
         return;
       }
@@ -487,7 +494,9 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const lastUsage = (await db.usage.orderBy('id').last())?.id ?? 0;
 
     try {
-      if (sdef.id === 'search') {
+      if (sdef.kind === 'records') {
+        await runRecordsStep(step, sdef, r);
+      } else if (sdef.id === 'search') {
         await runSearchStep(step, sdef);
       } else if (sdef.report && sdef.kind === 'agent') {
         await runReportStep(step, sdef, r);
@@ -545,6 +554,146 @@ export const useWorkflowStore = defineStore('workflow', () => {
   async function makeRuntime(): Promise<AgentRuntime> {
     const skills = await listSkills();
     return new AgentRuntime(app.gateway, skills);
+  }
+
+  /**
+   * 起草一学期的过程记录。
+   *
+   * 关键取舍：不一次生成整学期（7～8 篇要十几分钟，还容易被模型写飘），
+   * 而是按批走 —— 每批 3 篇、落一次库、界面点亮一次。
+   * 中途到调用上限就停下来说清楚还差几篇，下次接着补，已生成的不重写。
+   */
+  async function runRecordsStep(step: WorkflowRunStep, sdef: WorkflowStepDef, r: WorkflowRun) {
+    const p = projects.current;
+    if (!p) throw new Error('项目还没打开，先回到项目页再推进');
+    const term = (sdef.term ?? 1) as Term;
+
+    if (p.pureAi) {
+      step.status = 'done';
+      step.output = '本项目是纯 AI 生成，没有真实活动记录要求；生成的模拟内容会标注「（AI 模拟示例）」。';
+      return;
+    }
+
+    const target =
+      term === 1 ? Math.max(0, p.recordPlan?.firstTerm ?? 0) : Math.max(0, p.recordPlan?.secondTerm ?? 0);
+    const existing = projects.records.filter((x) => x.term === term);
+    const need = Math.max(0, target - existing.length);
+    if (!need) {
+      step.status = 'done';
+      step.output = `${termName(term)}已经有 ${existing.length} 篇记录，这次没有新增。要重写请到「过程记录」里改。`;
+      return;
+    }
+
+    let made = 0;
+    let lastErr = '';
+    let dry = 0;
+
+    while (made < need) {
+      if (cancelled) break;
+      const leftCalls = r.maxCalls - r.calls - step.calls;
+      if (leftCalls <= 0) break;
+      const n = batchCount(need - made, leftCalls);
+      if (n <= 0) break;
+
+      const from = existing.length + made;
+      act(step.id, `${termName(term)}第 ${from + 1}–${from + n} 篇`, 'running', '正在写这一批…');
+
+      let drafts: DraftRecord[] = [];
+      try {
+        drafts = await draftBatch(p, term, n, from);
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e);
+        throw new Error(`第 ${from + 1} 篇起的草稿没写出来：${lastErr}`);
+      }
+
+      if (!drafts.length) {
+        dry += 1;
+        if (dry >= 2) break;
+        continue;
+      }
+      dry = 0;
+
+      for (const d of drafts.slice(0, need - made)) {
+        const rec = toRecord(p.id, term, existing.length + made + 1, d);
+        await db.records.put(rec);
+        projects.records.push(rec);
+        made += 1;
+      }
+      act(step.id, `已写入第 ${existing.length + made} 篇`, 'done', `本批 ${drafts.length} 篇`);
+      await persist();
+    }
+
+    if (!made) {
+      step.status = 'failed';
+      step.error = lastErr
+        ? `记录草稿没写出来：${lastErr}`
+        : '模型这几次都没给出能用的记录，检查一下模型配置后点「只重跑这一步」再试。';
+      step.output = '';
+      return;
+    }
+
+    const rest = need - made;
+    step.status = 'done';
+    step.output =
+      `${termName(term)}已起草 ${made} 篇（第 ${existing.length + 1}–${existing.length + made} 篇），共 ${target} 篇。` +
+      (rest > 0 ? `还差 ${rest} 篇：到调用上限了，点「继续」再跑一次会接着写，已写好的不会重复。` : '') +
+      '\n这些是「按计划该做的事」，不是已经发生的记录：逐篇改成真实时间、真实参与人、真实做法，再点确认。';
+    step.warnings = [
+      `草稿 ${made} 篇均为未确认状态，未经你核对不能当作真实记录导出。`,
+      ...(rest > 0 ? [`还有 ${rest} 篇没起草，下次继续。`] : []),
+    ];
+  }
+
+  async function draftBatch(p: NonNullable<typeof projects.current>, term: Term, n: number, from: number) {
+    const ctx = {
+      topic: p.topic,
+      grade: p.grade,
+      modes: (p.modes ?? []) as string[],
+      members: (p.members ?? []).map((m) => m.name).filter(Boolean),
+      startDate: p.startDate,
+      endDate: p.endDate,
+    };
+    const res = await withTimeout(
+      app.gateway.chat({
+        messages: draftMessages(ctx, term, n, from),
+        agentId: 'project-planner',
+        tier: 'cheap',
+        temperature: 0.5,
+        maxTokens: 1600,
+      }),
+      120_000,
+      `${termName(term)}过程记录草稿`,
+    );
+    return parseDrafts(res.text, n);
+  }
+
+  /** 草稿 → 记录：一律未确认，正文写清这是待核对的计划动作 */
+  function toRecord(projectId: string, term: Term, index: number, d: DraftRecord): StudyRecord {
+    return {
+      id: uid('rec'),
+      projectId,
+      index,
+      term,
+      stageName: d.stageName,
+      activityName: d.activityName,
+      startDate: d.startDate,
+      endDate: d.endDate,
+      place: d.place,
+      participants: d.participants,
+      recorder: '',
+      recordedAt: todayISO(),
+      goal: d.goal,
+      work: d.work,
+      materials: d.materials,
+      outputs: d.outputs,
+      summary: d.summary,
+      nextPlan: d.nextPlan,
+      attachments: [],
+      activityIds: [],
+      sourceType: 'real',
+      confirmed: false,
+      updatedAt: Date.now(),
+    };
   }
 
   async function runAgentOnce(step: WorkflowRunStep, sdef: WorkflowStepDef, r: WorkflowRun) {
@@ -653,8 +802,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
       return true;
     });
     if (!targets.length) {
-      step.status = 'skipped';
-      step.output = '各章节都已有内容，这次没有改写。要重写请在工作流设置里打开「覆盖已有正文」。';
+      step.status = 'done';
+      step.output = `《${report.title}》各章节都已有正文，这一步没有改写。要重写请在推进设置里打开「覆盖已有正文」。`;
       return;
     }
 

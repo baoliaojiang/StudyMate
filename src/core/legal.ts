@@ -422,58 +422,62 @@ export const LEGAL_DOCS: LegalDoc[] = [
   },
   {
     id: 'license',
-    title: '开源许可',
-    summary: '允许二次分发与修改，但须保留原项目链接与作者信息；MIT 许可证正文与第三方组件许可。',
-    version: '1.1',
+    title: '使用许可',
+    summary: '学习与自己学校使用免费；商业使用与对外二次分发需先取得授权（QQ 群 1134731856）；任何使用都要保留作者与原仓库信息。',
+    version: '1.2',
     updatedAt: '2026-11-06',
     sections: [
       {
-        heading: '附录：开源许可说明',
+        heading: '附录：这份许可怎么读',
         body:
-          '本软件源代码开源，允许二次分发与修改，唯一的附加要求是署名：分发时要在软件里看得见的地方保留原项目链接与作者信息。第三方依赖遵循各自许可证。许可全文与第三方依赖清单，以软件内本页及项目仓库 LICENSE 文件为准。\n\n' +
-          '本附录仅为索引说明，不替代正式开源许可证文本；如本附录与许可证文本不一致，以许可证文本为准。',
+          '本软件不是开源许可：源码可以看、可以学、可以改着自己用，但商业使用与对外二次分发要先拿到授权。\n\n' +
+          '一句话版本：学习免费，商用与分发先问，校内免费适配只要保留出处。\n\n' +
+          '许可全文与第三方组件清单以软件内本页及项目仓库 LICENSE 文件为准；两者不一致时，以 LICENSE 文件为准。',
       },
       {
-        heading: '一、二次分发与署名要求',
+        heading: '一、可以直接做的事',
         body:
-          '你可以直接转发本软件的安装包，也可以修改后再分发，不需要事先取得授权，也不需要付费。商用、改名、闭源集成都允许，不要求回馈代码。\n\n' +
-          '唯一的附加要求是署名——让使用者能点到原项目：\n' +
-          '· 对外分发的每个版本，都要在软件内使用者可到达的位置保留原项目信息，例如「设置 → 关于」里的项目链接；\n' +
-          '· 只写在安装包说明、压缩包文件名或源码注释里不算，必须是软件运行时能看见、能点开的入口；\n' +
-          '· 不允许删除、遮挡、置灰或以改名换皮的方式隐藏这条信息。\n\n' +
-          '原项目信息（请原样保留）：\n' +
+          '· 阅读、学习、研究源码，包括把代码抄进作业、课程设计或论文附录；\n' +
+          '· 自己安装使用，或在班级、社团、小组里使用；\n' +
+          '· 为自己学校做适配：改校名、改表格模板、改流程、改文案，然后免费分发给本校师生——这一条不需要授权。',
+      },
+      {
+        heading: '二、需要先拿到授权的事',
+        body:
+          '商业使用：收费售卖、付费课程或训练营、按次收费的咨询与代做、招投标项目、企业或机构内部培训、把本软件作为服务或产品的一部分对外提供。\n\n' +
+          '二次分发（校内免费适配之外的所有情形）：上架应用商店、传到下载站或网盘公开分享、打包进别的软件、随硬件或课程包一起发、改个名字当自己的作品发布。\n\n' +
+          '授权方式：进 QQ 群 1134731856，说明「谁、用来做什么、发给谁、是否收费」。拿到明确答复后再使用；没有答复视为未获授权。授权只对答复里写明的范围有效，换用途要重新说明。',
+      },
+      {
+        heading: '三、必须保留的信息',
+        body:
+          '任何形式的使用与分发都要保留原项目信息：\n' +
           '项目名：研学帮 StudyMate\n' +
           '作者：baoliaojiang\n' +
           '项目仓库：https://github.com/baoliaojiang/StudyMate\n\n' +
-          '二次分发的版本请注明「本版本由 …… 基于 StudyMate 修改」，不要让人误以为这是原作者发布的官方版本。',
+          '· 软件内「设置 → 关于 → 制作人员」要保留，能看到作者与仓库入口；\n' +
+          '· 不得删除、遮挡、置灰或以改名换皮的方式隐藏；\n' +
+          '· 只写在安装包说明、压缩包文件名或源码注释里不算，必须是运行时能看见、能点开的入口；\n' +
+          '· 二次分发的版本请注明「本版本由 …… 基于 StudyMate 修改」，不要让人误以为是原作者的官方版本。',
       },
       {
-        heading: '二、MIT License',
+        heading: '四、历史版本',
         body:
-          'Copyright (c) 2026 StudyMate Contributors\n\n' +
-          'Permission is hereby granted, free of charge, to any person obtaining a copy of this software ' +
-          'and associated documentation files (the "Software"), to deal in the Software without restriction, ' +
-          'including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, ' +
-          'and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, ' +
-          'subject to the following conditions:\n\n' +
-          'The above copyright notice and this permission notice shall be included in all copies or substantial ' +
-          'portions of the Software.\n\n' +
-          'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT ' +
-          'LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. ' +
-          'IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, ' +
-          'WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE ' +
-          'SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.',
+          'v1.0.13（含）之前发布的版本在发布时采用 MIT 许可，已经获得的授权继续有效，不会被收回。' +
+          '从本版本起，使用与分发按本许可执行。',
       },
       {
-        heading: '三、随应用分发的第三方组件',
+        heading: '五、随应用分发的第三方组件',
         body:
           'Vue.js、Vite、Pinia、Vue Router（MIT）；Dexie.js（Apache-2.0）；docx（MIT）；JSZip（MIT 或 GPL-3.0，本项目按 MIT 使用）；' +
           'HarmonyOS Sans 字体（华为提供，按其许可条款随应用分发，仅用于界面显示）。\n\n' +
-          '各组件的完整许可证文本随依赖包提供，可在项目仓库的 node_modules 对应目录中查阅。',
+          '各组件的完整许可证文本随依赖包提供，可在项目仓库的 node_modules 对应目录中查阅。本许可不改变这些组件的授权条件。',
       },
       {
-        heading: '四、不含第三方素材',
+        heading: '六、担保与不含第三方素材',
         body:
+          '软件按「现状」提供，不承诺适用于任何特定用途，也不承诺导出结果符合你所在学校的具体要求。' +
+          '生成内容由你使用的模型服务产出，事实、数据、文献需要你自己核对。\n\n' +
           '应用内不包含学校校徽、校名标识图片、商业字体或图库素材。界面图标为项目内绘制的线性图标。' +
           '若你认为某处内容侵犯了你的权利，可通过项目仓库的 Issue 联系，核实后会移除。',
       },

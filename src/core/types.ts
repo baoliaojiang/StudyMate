@@ -770,7 +770,7 @@ export type WorkflowScope = 'report' | 'stage' | 'project';
  * - guard：只做条件检查，不满足就停下（例如没有真实记录）
  * - manual：需要人动手（导出 DOCX、去补记录）
  */
-export type WorkflowStepKind = 'agent' | 'gate' | 'guard' | 'manual';
+export type WorkflowStepKind = 'agent' | 'gate' | 'guard' | 'records' | 'manual';
 
 export interface WorkflowStepDef {
   id: string;
