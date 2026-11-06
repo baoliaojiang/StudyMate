@@ -14,7 +14,7 @@
 export const SITE = {
   appName: '研学帮 StudyMate',
   /** 当前版本，需与 package.json 保持一致 */
-  version: '1.0.15',
+  version: '1.0.16',
 
   /** 作者主页（已填） */
   authorHome: 'https://github.com/baoliaojiang',
@@ -43,6 +43,21 @@ export const SITE = {
   apiGuide: '', // 免费 API 指引配置文件地址
   updateJson: '', // 更新 JSON 地址
 } as const;
+
+/**
+ * 启动更新弹窗的策略
+ *
+ * 默认行为：发现新版本时，弹窗同时提供「去更新」和「下次再说」——
+ * 用户可以自己决定什么时候升级，弹窗不会因为「强制模态」就剥夺选择权。
+ * 只有在下面**明确写出版本号 / 起始版本**时，才会隐藏「下次再说」，
+ * 让该版本变成必须升级。没有配置就不生效，不存在隐式强制。
+ */
+export const UPDATE_POLICY = {
+  /** 明确列出的强制升级版本，如 ['1.0.20'] */
+  mandatoryVersions: [] as string[],
+  /** 自该版本起（含）全部强制升级；留空表示不启用 */
+  mandatoryFrom: '',
+};
 
 export interface SiteLink {
   key: string;

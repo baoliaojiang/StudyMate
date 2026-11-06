@@ -242,7 +242,7 @@ watch(open, (v) => {
   max-width: 190px; height: 32px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: var(--r-full);
   background: var(--surface-2); color: var(--text-2);
-  font: inherit; font-size: 12px; cursor: pointer;
+  font: inherit; font-size: calc(12px * var(--font-scale)); cursor: pointer;
   transition: border-color var(--dur-2), background var(--dur-2);
 }
 .chip:hover { border-color: var(--line-strong); background: var(--surface); }
@@ -250,7 +250,7 @@ watch(open, (v) => {
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex: 0 0 6px; }
 .dot.off { background: var(--text-3); }
 .chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 108px; }
-.tier { font-size: 10px; color: var(--text-3); padding: 1px 5px; border-radius: var(--r-full); background: var(--surface-3); }
+.tier { font-size: calc(10px * var(--font-scale)); color: var(--text-3); padding: 1px 5px; border-radius: var(--r-full); background: var(--surface-3); }
 
 .scrim {
   position: fixed; inset: 0; z-index: 90;
@@ -267,10 +267,10 @@ watch(open, (v) => {
   padding: 16px;
 }
 .sheet-head { display: flex; align-items: center; padding: 2px 4px 8px; }
-.sheet-head b { font-size: 15px; flex: 1; }
-.x { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-3); font-size: 20px; border-radius: 50%; cursor: pointer; }
+.sheet-head b { font-size: calc(15px * var(--font-scale)); flex: 1; }
+.x { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-3); font-size: calc(20px * var(--font-scale)); border-radius: 50%; cursor: pointer; }
 .x:hover { background: var(--surface-2); }
-.hint { margin: 0 4px 12px; font-size: 11.5px; line-height: 1.7; color: var(--text-3); }
+.hint { margin: 0 4px 12px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.7; color: var(--text-3); }
 
 .think-row {
   display: flex; align-items: center; gap: 10px;
@@ -280,14 +280,14 @@ watch(open, (v) => {
 }
 .think-row.off { opacity: 0.55; cursor: default; }
 .tr-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.tr-text b { font-size: 12.5px; font-weight: var(--fw-medium); }
-.tr-text span { font-size: 11px; color: var(--text-3); }
+.tr-text b { font-size: calc(12.5px * var(--font-scale)); font-weight: var(--fw-medium); }
+.tr-text span { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 .think-row input { width: 17px; height: 17px; accent-color: var(--primary); flex: 0 0 17px; }
 
 .group + .group { margin-top: 14px; }
 .group-head { display: flex; align-items: baseline; gap: 8px; padding: 0 6px 6px; }
-.group-head b { font-size: 12.5px; }
-.group-head span { font-size: 11px; color: var(--text-3); }
+.group-head b { font-size: calc(12.5px * var(--font-scale)); }
+.group-head span { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 
 .row {
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -300,19 +300,19 @@ watch(open, (v) => {
 .row:hover { background: var(--surface-2); }
 .row.on { background: var(--surface-2); }
 .row-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.row-name { font-size: 13.5px; font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-sub { font-size: 10.5px; color: var(--text-3); }
-.row-price { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.row-name { font-size: calc(13.5px * var(--font-scale)); font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sub { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
+.row-price { font-size: calc(11px * var(--font-scale)); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .tick { color: var(--primary); display: inline-flex; animation: pop-in 380ms var(--spring-under) both; }
 
 .manage {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; margin-top: 10px; padding: 12px;
   border: none; border-top: 1px solid var(--line); background: transparent;
-  color: var(--text-2); font: inherit; font-size: 12px; cursor: pointer;
+  color: var(--text-2); font: inherit; font-size: calc(12px * var(--font-scale)); cursor: pointer;
 }
 .empty { padding: 18px 6px; display: flex; flex-direction: column; gap: 12px; }
-.empty p { margin: 0; font-size: 12.5px; line-height: 1.7; color: var(--text-2); }
+.empty p { margin: 0; font-size: calc(12.5px * var(--font-scale)); line-height: 1.7; color: var(--text-2); }
 
 .drop-enter-active { transition: opacity var(--dur-2) var(--ease-out); }
 .drop-leave-active { transition: opacity var(--dur-2) var(--ease-in); }

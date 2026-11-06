@@ -84,17 +84,17 @@ async function copyVersion() {
 .plan-top { display: flex; flex-direction: column; gap: 6px; }
 .tag {
   align-self: flex-start;
-  font-size: 10.5px; padding: 2px 8px; border-radius: var(--r-full);
+  font-size: calc(10.5px * var(--font-scale)); padding: 2px 8px; border-radius: var(--r-full);
   background: var(--primary-soft, rgba(31, 79, 216, 0.1)); color: var(--primary);
 }
-.plan-top b { font-size: 20px; letter-spacing: -0.01em; }
-.plan-top p { margin: 0; font-size: 12.5px; line-height: 1.7; color: var(--text-2); }
+.plan-top b { font-size: calc(20px * var(--font-scale)); letter-spacing: -0.01em; }
+.plan-top p { margin: 0; font-size: calc(12.5px * var(--font-scale)); line-height: 1.7; color: var(--text-2); }
 .plan-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
   margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
 }
 .plan-grid div { display: flex; flex-direction: column; gap: 3px; }
-.plan-grid b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.plan-grid span { font-size: 11px; color: var(--text-3); }
+.plan-grid b { font-size: calc(17px * var(--font-scale)); font-variant-numeric: tabular-nums; }
+.plan-grid span { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 @media (max-width: 560px) { .plan-grid { grid-template-columns: 1fr; } }
 </style>

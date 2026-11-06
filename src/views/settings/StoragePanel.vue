@@ -381,7 +381,7 @@ function back() {
 <style scoped>
 .usage-box { padding: 6px 2px 2px; }
 .usage-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.usage-top b { font-size: 22px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.usage-top b { font-size: calc(22px * var(--font-scale)); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .bar { height: 6px; margin-top: 10px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 3px; background: var(--primary); transition: width var(--dur-2) var(--ease-out); }
 
@@ -393,11 +393,11 @@ function back() {
 }
 .act:first-of-type { border-top: none; }
 .act > span:first-child { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.act b { font-size: 13.5px; font-weight: var(--fw-medium); }
-.act span span { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
-.act-go { color: var(--text-3); font-size: 16px; }
+.act b { font-size: calc(13.5px * var(--font-scale)); font-weight: var(--fw-medium); }
+.act span span { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
+.act-go { color: var(--text-3); font-size: calc(16px * var(--font-scale)); }
 .act:disabled { opacity: 0.5; }
 .measure { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 2px 2px 6px; }
-.measure b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.measure b { font-size: calc(18px * var(--font-scale)); font-variant-numeric: tabular-nums; }
 .measure button { margin-left: auto; }
 </style>

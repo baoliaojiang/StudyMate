@@ -7,7 +7,9 @@ import { NAV_ICONS } from './nav';
 import ModelPicker from './components/ModelPicker.vue';
 import SideNav from './components/SideNav.vue';
 import GlobalConfirm from './components/GlobalConfirm.vue';
+import StartupUpdateModal from './components/StartupUpdateModal.vue';
 import { bypassLeaveOnce, closeTopOverlay, confirmLeave, pushOverlay } from './core/task-guard';
+import { checkStartupUpdate, markUpdateLater, type StartupUpdate } from './core/startup-update';
 import { skipRateLimitWait } from './ai/http';
 
 const app = useAppStore();
@@ -38,6 +40,34 @@ function openDrawer() {
 const isOnboarding = computed(() => route.name === 'onboarding');
 
 /**
+ * 启动更新弹窗
+ * 首次引导还没走完时不弹，等用户离开引导再补上；「下次再说」只在本次会话内生效，
+ * 下次打开应用仍会再检查一遍。
+ */
+const startupUpdate = ref<StartupUpdate | null>(null);
+let pendingUpdate: StartupUpdate | null = null;
+
+function presentUpdate(u: StartupUpdate) {
+  if (isOnboarding.value) {
+    pendingUpdate = u;
+    return;
+  }
+  startupUpdate.value = u;
+}
+
+function closeUpdate(kind: 'go' | 'later') {
+  if (kind === 'later' && startupUpdate.value) markUpdateLater(startupUpdate.value.version);
+  startupUpdate.value = null;
+}
+
+watch(isOnboarding, (on) => {
+  if (!on && pendingUpdate) {
+    startupUpdate.value = pendingUpdate;
+    pendingUpdate = null;
+  }
+});
+
+/**
  * 页面切换方向
  *
  * 用层级差判断：进入下一层从右侧滑入，返回上一层从左侧滑入。
@@ -48,6 +78,8 @@ const depth = computed(() => {
   if (name === 'settings') return route.params.tab ? 2 : 1;
   // 项目页的下一层：进入从右、返回从左
   if (name === 'deck') return 2;
+  // 单篇记录编辑：项目页里再下一层
+  if (name === 'record') return 3;
   if (name === 'home') return 0;
   return 1;
 });
@@ -65,6 +97,7 @@ const pageTitle = computed(() => {
     new: '新建项目',
     settings: '设置',
     dev: '开发者',
+    record: '研究记录',
     project: projects.current?.topic ?? '项目',
     deck: '答辩 PPT',
     onboarding: '欢迎',
@@ -166,6 +199,12 @@ onMounted(async () => {
     window.setTimeout(() => (splash.value = false), 420);
   }, 3000);
   installNativeBack();
+  // 每次进入应用自动查一次新版本（官方接口 + 镜像可达性）；
+  // 等开屏结束再弹，避免被开屏盖住。失败静默，不阻塞启动。
+  void checkStartupUpdate().then((found) => {
+    if (!found) return;
+    window.setTimeout(() => presentUpdate(found), 3400);
+  });
 });
 
 /**
@@ -244,6 +283,7 @@ const themeLabel = computed(() =>
 <template>
   <!-- 系统 confirm 在 WebView 里会被拦掉，统一用应用内弹层 -->
   <GlobalConfirm />
+  <StartupUpdateModal v-if="startupUpdate" :update="startupUpdate" @close="closeUpdate" />
 
   <!-- 开屏：只盖在界面上，不挡数据加载（init 与它并行跑） -->
   <div v-if="splash" class="splash" :class="{ out: splashLeaving }">
@@ -349,7 +389,7 @@ const themeLabel = computed(() =>
   padding: 8px 16px;
   background: var(--warn-soft, rgba(214, 158, 46, 0.14));
   color: var(--text);
-  font-size: 12px; line-height: 1.6;
+  font-size: calc(12px * var(--font-scale)); line-height: 1.6;
 }
 .rate-banner span { flex: 1; min-width: 0; }
 .rate-banner .btn { flex: 0 0 auto; }
@@ -363,7 +403,7 @@ const themeLabel = computed(() =>
   position: sticky; top: 0; z-index: 5;
 }
 .nav-arrows { display: flex; gap: 2px; }
-.topbar-title { font-size: 13.5px; font-weight: var(--fw-medium); color: var(--text); }
+.topbar-title { font-size: calc(13.5px * var(--font-scale)); font-weight: var(--fw-medium); color: var(--text); }
 .crumb { color: var(--text-3); font-weight: var(--fw-normal); }
 .icon-btn {
   width: 34px; height: 34px;
@@ -387,7 +427,7 @@ const themeLabel = computed(() =>
   background: var(--surface-3);
   border: 1px solid var(--line-strong);
   box-shadow: var(--shadow-2);
-  font-size: 12.5px; z-index: 60;
+  font-size: calc(12.5px * var(--font-scale)); z-index: 60;
 }
 .busy-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); animation: pulse 1s infinite ease-in-out; }
 @keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
@@ -407,7 +447,7 @@ const themeLabel = computed(() =>
   background: var(--surface-3);
   border: 1px solid var(--line-strong);
   box-shadow: var(--shadow-2);
-  font-size: 12.5px; line-height: 1.55;
+  font-size: calc(12.5px * var(--font-scale)); line-height: 1.55;
 }
 .toast-ok { border-color: rgba(47, 107, 87, 0.5); }
 .toast-warn { border-color: rgba(138, 90, 0, 0.5); }
@@ -430,12 +470,12 @@ const themeLabel = computed(() =>
 }
 .splash-name {
   margin-top: 6px;
-  font-size: 17px; font-weight: var(--fw-strong);
+  font-size: calc(17px * var(--font-scale)); font-weight: var(--fw-strong);
   letter-spacing: 0.14em; color: var(--text);
   animation: splash-up 560ms 120ms var(--ease-out) both;
 }
 .splash-sub {
-  font-size: 11.5px; color: var(--text-3); letter-spacing: 0.04em;
+  font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); letter-spacing: 0.04em;
   animation: splash-up 560ms 200ms var(--ease-out) both;
 }
 .splash-bar {

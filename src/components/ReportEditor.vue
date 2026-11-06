@@ -22,6 +22,7 @@ import { uid } from '../core/id';
 import { getAgent } from '../agents/definitions';
 import { AgentRuntime } from '../agents/runtime';
 import { TEMPLATE_NOTE } from '../core/settings';
+import { askConfirm, askPrompt } from '../core/task-guard';
 
 const props = defineProps<{ report: Report }>();
 const app = useAppStore();
@@ -115,9 +116,12 @@ function ctxTextForSection(): string {
 const gapMode = computed(() => app.settings.gapMode);
 async function setGapMode(mode: 'strict' | 'fill') {
   if (mode === 'fill') {
-    const ok = confirm(
-      '关闭留白后，AI 会把缺材料的章节尽量写满：推断处标「需核实」，具体数据仍留横线，结尾附免责声明。\n\n提交前必须逐条核对，不能直接交。继续？',
-    );
+    const ok = await askConfirm({
+      title: '关闭留白',
+      message: '关闭留白后，AI 会把缺材料的章节尽量写满：推断处标「需核实」，具体数据仍留横线，结尾附免责声明。\n\n提交前必须逐条核对，不能直接交。继续？',
+      confirmText: '仍然继续',
+      tone: 'warn',
+    });
     if (!ok) return;
   }
   await app.saveSettings({ gapMode: mode });
@@ -244,7 +248,15 @@ async function generateAll() {
   }
   for (const s of draft.value.sections) {
     if (NON_AI_SECTIONS.includes(s.heading)) continue;
-    if (s.body.trim() && !confirm(`「${s.heading}」已有内容，重新生成会覆盖。继续？`)) continue;
+    if (s.body.trim()) {
+      const ok = await askConfirm({
+        title: '重新生成会覆盖',
+        message: `「${s.heading}」已有内容，重新生成会覆盖。继续？`,
+        confirmText: '仍然继续',
+        tone: 'warn',
+      });
+      if (!ok) continue;
+    }
     active.value = s.id;
     await generateSection();
   }
@@ -286,14 +298,21 @@ async function fillPlaceholders() {
 async function renameSection() {
   const s = section.value;
   if (!s) return;
-  const name = prompt('章节标题', s.heading);
+  const name = await askPrompt({
+    title: '章节标题',
+    initialValue: s.heading,
+    placeholder: '输入新的章节标题',
+  });
   if (!name?.trim() || name.trim() === s.heading) return;
   s.heading = name.trim();
   markDirty();
 }
 
 async function addSection() {
-  const name = prompt('新增章节标题');
+  const name = await askPrompt({
+    title: '新增章节标题',
+    placeholder: '输入章节标题',
+  });
   if (!name?.trim()) return;
   const sec: ReportSection = {
     id: uid('sec'),
@@ -315,7 +334,13 @@ async function removeSection() {
     app.toast('至少保留一个章节', 'warn');
     return;
   }
-  if (!confirm(`删除章节「${s.heading}」及其正文？`)) return;
+  const ok = await askConfirm({
+    title: '删除章节',
+    message: `删除章节「${s.heading}」及其正文？`,
+    confirmText: '删除',
+    tone: 'warn',
+  });
+  if (!ok) return;
   draft.value.sections = draft.value.sections.filter((x) => x.id !== s.id);
   active.value = draft.value.sections[0]?.id ?? '';
   markDirty();
@@ -380,7 +405,13 @@ async function applyTemplate() {
 }
 
 async function resetTemplate() {
-  if (!confirm('恢复为内置通用模板？已写的正文会按标题保留，标题不一致的章节会丢失。')) return;
+  const ok = await askConfirm({
+    title: '恢复内置通用模板',
+    message: '恢复为内置通用模板？已写的正文会按标题保留，标题不一致的章节会丢失。',
+    confirmText: '仍然恢复',
+    tone: 'warn',
+  });
+  if (!ok) return;
   const t = templateFor(draft.value.kind);
   const old = new Map(draft.value.sections.map((s) => [s.heading, s]));
   draft.value.sections = t.sections.map((sp) => ({
@@ -519,7 +550,15 @@ async function setStatus(next: ReportStatus) {
       return;
     }
     const placeholders = draft.value.sections.filter((s) => /待补充/.test(s.body));
-    if (placeholders.length && !confirm(`还有 ${placeholders.length} 节写着「待补充」。确认仍要标记为已确认？`)) return;
+    if (placeholders.length) {
+      const ok = await askConfirm({
+        title: '仍有「待补充」章节',
+        message: `还有 ${placeholders.length} 节写着「待补充」。确认仍要标记为已确认？`,
+        confirmText: '仍然确认',
+        tone: 'warn',
+      });
+      if (!ok) return;
+    }
   }
   draft.value.status = next;
   await store.saveReport(draft.value);
@@ -610,11 +649,11 @@ async function setStatus(next: ReportStatus) {
           <button class="btn btn-sm btn-primary" type="button" :disabled="!dirty" @click="save">保存</button>
         </div>
 
-        <div v-for="w in lastWarnings" :key="w" class="banner banner-warn" style="margin-top: 12px; font-size: 12.5px">
+        <div v-for="w in lastWarnings" :key="w" class="banner banner-warn" style="margin-top: 12px; font-size: calc(12.5px * var(--font-scale))">
           {{ w }}
         </div>
 
-        <div v-if="section.containsSimulated" class="banner banner-sim" style="margin-top: 12px; font-size: 12px">
+        <div v-if="section.containsSimulated" class="banner banner-sim" style="margin-top: 12px; font-size: calc(12px * var(--font-scale))">
           本节已标模拟。导出时文首会有提示框，正文保留「（AI 模拟示例）」标识，不会被当成真实数据。
         </div>
       </div>
@@ -836,11 +875,11 @@ async function setStatus(next: ReportStatus) {
 .editor { display: grid; grid-template-columns: 196px 1fr 224px; gap: 16px; padding: 18px 20px 40px; }
 .toc { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 12px; align-self: start; }
 .toc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; gap: 6px; }
-.toc-title { font-size: 12px; color: var(--text-3); font-weight: var(--fw-medium); }
+.toc-title { font-size: calc(12px * var(--font-scale)); color: var(--text-3); font-weight: var(--fw-medium); }
 .toc-item {
   display: flex; align-items: center; gap: 8px; text-align: left;
   padding: 8px 10px; border-radius: var(--r-1); border: none; background: transparent;
-  color: var(--text-3); font-size: 12.5px; cursor: pointer; line-height: 1.4;
+  color: var(--text-3); font-size: calc(12.5px * var(--font-scale)); cursor: pointer; line-height: 1.4;
   transition: background var(--dur-2), color var(--dur-2);
 }
 .toc-item:hover { background: var(--surface); color: var(--text-2); }
@@ -848,11 +887,11 @@ async function setStatus(next: ReportStatus) {
 .toc-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.45; flex: 0 0 5px; }
 .toc-item.done .toc-dot { opacity: 1; background: var(--ok); }
 .toc-name { flex: 1; min-width: 0; }
-.toc-req { font-size: 9.5px; color: var(--danger); flex: 0 0 auto; }
+.toc-req { font-size: calc(9.5px * var(--font-scale)); color: var(--danger); flex: 0 0 auto; }
 .toc-actions { display: flex; gap: 4px; margin-top: 8px; }
 .mini {
   flex: 1; height: 28px; border: 1px solid var(--line); border-radius: var(--r-full);
-  background: transparent; color: var(--text-3); font: inherit; font-size: 10.5px; cursor: pointer;
+  background: transparent; color: var(--text-3); font: inherit; font-size: calc(10.5px * var(--font-scale)); cursor: pointer;
 }
 .mini:hover { border-color: var(--line-strong); color: var(--text-2); }
 
@@ -863,24 +902,24 @@ async function setStatus(next: ReportStatus) {
   background: var(--surface-2); border-radius: var(--r-1);
 }
 .tpl-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); margin-top: 7px; flex: 0 0 5px; }
-.tpl-note p { margin: 0; font-size: 11.5px; line-height: 1.65; color: var(--text-3); }
+.tpl-note p { margin: 0; font-size: calc(11.5px * var(--font-scale)); line-height: 1.65; color: var(--text-3); }
 
 .body-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.sec-title { font-size: 18px; margin: 0; }
-.sec-meta { display: flex; align-items: center; gap: 10px; margin-top: 5px; font-size: 11.5px; color: var(--text-3); flex-wrap: wrap; }
+.sec-title { font-size: calc(18px * var(--font-scale)); margin: 0; }
+.sec-meta { display: flex; align-items: center; gap: 10px; margin-top: 5px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); flex-wrap: wrap; }
 .hint-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; }
 .hint {
-  flex: 1; font-size: 12px; color: var(--text-3); line-height: 1.7; padding: 9px 12px;
+  flex: 1; font-size: calc(12px * var(--font-scale)); color: var(--text-3); line-height: 1.7; padding: 9px 12px;
   background: var(--surface-2); border-radius: var(--r-1);
 }
-.main-input { min-height: 380px; font-size: 14px; line-height: 1.85; }
-.blank { padding: 40px; text-align: center; font-size: 12.5px; color: var(--text-3); }
+.main-input { min-height: 380px; font-size: calc(14px * var(--font-scale)); line-height: 1.85; }
+.blank { padding: 40px; text-align: center; font-size: calc(12.5px * var(--font-scale)); color: var(--text-3); }
 
 .side { position: sticky; top: 12px; align-self: start; }
-.side-title { font-size: 12.5px; font-weight: var(--fw-medium); color: var(--text-2); margin-bottom: 10px; }
+.side-title { font-size: calc(12.5px * var(--font-scale)); font-weight: var(--fw-medium); color: var(--text-2); margin-bottom: 10px; }
 .fill-note {
   margin: 8px 0 0; padding: 8px 10px;
-  font-size: 11px; line-height: 1.65; color: var(--warn);
+  font-size: calc(11px * var(--font-scale)); line-height: 1.65; color: var(--warn);
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border-radius: var(--r-2);
 }
@@ -903,14 +942,14 @@ async function setStatus(next: ReportStatus) {
 }
 .status-btn {
   height: 30px; border: none; border-radius: var(--r-full); background: transparent;
-  color: var(--text-3); font-size: 11.5px; cursor: pointer;
+  color: var(--text-3); font-size: calc(11.5px * var(--font-scale)); cursor: pointer;
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 .status-btn:hover { color: var(--text); }
 .status-btn.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); font-weight: var(--fw-medium); }
 .status-hint { margin: 8px 0 0; line-height: 1.6; }
 .field { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: 11px; color: var(--text-3); }
+.field-label { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 
 .docx-scrim { padding: 0; }
 .docx-card {
@@ -935,7 +974,7 @@ async function setStatus(next: ReportStatus) {
 .docx-loading {
   position: absolute; inset: 0; margin: 0;
   display: grid; place-items: center;
-  color: #fff; font-size: 12.5px;
+  color: #fff; font-size: calc(12.5px * var(--font-scale));
 }
 
 .modal-scrim {
@@ -952,11 +991,11 @@ async function setStatus(next: ReportStatus) {
 }
 @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
 .preview-bar { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
-.preview-bar b { flex: 1; font-size: 14px; }
+.preview-bar b { flex: 1; font-size: calc(14px * var(--font-scale)); }
 .import { padding-bottom: 16px; }
 .import > :not(.preview-bar) { margin-left: 18px; margin-right: 18px; }
 .import > .preview-bar { margin: 0 0 14px; }
-.x { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-3); font-size: 20px; border-radius: 50%; cursor: pointer; }
+.x { width: 30px; height: 30px; border: none; background: transparent; color: var(--text-3); font-size: calc(20px * var(--font-scale)); border-radius: 50%; cursor: pointer; }
 
 .paper {
   flex: 1; overflow-y: auto;
@@ -965,28 +1004,28 @@ async function setStatus(next: ReportStatus) {
   font-family: var(--font-serif);
 }
 .paper-head { text-align: center; margin-bottom: 26px; }
-.paper-body { font-size: 12.5px; line-height: 1.9; color: #1a1a1a; }
+.paper-body { font-size: calc(12.5px * var(--font-scale)); line-height: 1.9; color: #1a1a1a; }
 .paper-body :deep(.md) { color: inherit; font-size: inherit; line-height: inherit; }
-.paper-school { font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
-.paper-head h1 { font-size: 22px; margin: 0 0 10px; }
-.paper-meta { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--text-2); }
+.paper-school { font-size: calc(13px * var(--font-scale)); color: var(--text-2); margin-bottom: 6px; }
+.paper-head h1 { font-size: calc(22px * var(--font-scale)); margin: 0 0 10px; }
+.paper-meta { display: flex; flex-direction: column; gap: 3px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-2); }
 .paper-sec { margin-bottom: 16px; }
-.paper-sec h2 { font-size: 14px; margin: 0 0 6px; }
-.paper-sec h2.lv2 { font-size: 13px; margin-left: 12px; }
-.paper-sec p { margin: 0 0 6px; font-size: 12.5px; line-height: 1.9; text-indent: 2em; color: var(--text); }
-.paper-sim { font-size: 10.5px; color: var(--sim); }
+.paper-sec h2 { font-size: calc(14px * var(--font-scale)); margin: 0 0 6px; }
+.paper-sec h2.lv2 { font-size: calc(13px * var(--font-scale)); margin-left: 12px; }
+.paper-sec p { margin: 0 0 6px; font-size: calc(12.5px * var(--font-scale)); line-height: 1.9; text-indent: 2em; color: var(--text); }
+.paper-sim { font-size: calc(10.5px * var(--font-scale)); color: var(--sim); }
 .paper-refs { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); }
-.paper-refs h2 { font-size: 14px; margin: 0 0 8px; }
-.paper-refs p { margin: 0 0 5px; font-size: 11.5px; line-height: 1.7; }
+.paper-refs h2 { font-size: calc(14px * var(--font-scale)); margin: 0 0 8px; }
+.paper-refs p { margin: 0 0 5px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.7; }
 .ref-type { margin-left: 6px; color: var(--text-3); }
 
 .detected { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
-.detected-head { font-size: 11.5px; color: var(--text-3); margin-bottom: 8px; }
+.detected-head { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); margin-bottom: 8px; }
 .detected ul { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
-.detected li { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; }
-.det-lv { font-size: 9.5px; color: var(--text-3); background: var(--surface-2); padding: 1px 5px; border-radius: var(--r-full); }
+.detected li { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: calc(12.5px * var(--font-scale)); }
+.det-lv { font-size: calc(9.5px * var(--font-scale)); color: var(--text-3); background: var(--surface-2); padding: 1px 5px; border-radius: var(--r-full); }
 .det-text { flex: 1; }
-.det-via { font-size: 10px; color: var(--text-3); }
+.det-via { font-size: calc(10px * var(--font-scale)); color: var(--text-3); }
 
 @media (max-width: 1180px) {
   .editor { grid-template-columns: 170px 1fr; }

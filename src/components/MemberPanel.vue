@@ -8,6 +8,7 @@ import { useAppStore } from '../stores/app';
 import { useProjectStore } from '../stores/projects';
 import { uid } from '../core/id';
 import type { Member } from '../core/types';
+import { askConfirm } from '../core/task-guard';
 
 const app = useAppStore();
 const store = useProjectStore();
@@ -48,7 +49,13 @@ async function add() {
 }
 
 async function remove(m: Member) {
-  if (!confirm(`把「${m.name}」从小组里移除？`)) return;
+  const ok = await askConfirm({
+    title: '移除成员',
+    message: `把「${m.name}」从小组里移除？`,
+    confirmText: '移除',
+    tone: 'warn',
+  });
+  if (!ok) return;
   await store.removeMember(m.id);
   flashSaved();
 }
@@ -120,7 +127,7 @@ const dutyFilled = computed(() => members.value.filter((m) => (m.duty ?? '').tri
 }
 .panel-title { font-size: var(--fs-4); letter-spacing: -0.02em; }
 .save-hint {
-  flex: 0 0 auto; font-size: 11.5px; color: var(--text-3);
+  flex: 0 0 auto; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3);
   padding: 4px 10px; border-radius: var(--r-full);
   background: var(--surface-2);
   transition: color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
@@ -143,7 +150,7 @@ const dutyFilled = computed(() => members.value.filter((m) => (m.duty ?? '').tri
 .m-name-input:focus { background: var(--surface-2); }
 .mini {
   border: none; background: none; cursor: pointer;
-  font-size: 11.5px; color: var(--text-3); padding: 4px 6px; border-radius: var(--r-1);
+  font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); padding: 4px 6px; border-radius: var(--r-1);
 }
 .mini:hover { background: var(--surface-2); color: var(--text); }
 .mini.danger { color: var(--danger); }
@@ -151,5 +158,5 @@ const dutyFilled = computed(() => members.value.filter((m) => (m.duty ?? '').tri
   min-height: 62px; font-size: var(--fs-2); line-height: 1.7;
   border-radius: var(--r-2); background: var(--surface-2);
 }
-.foot-note { margin: var(--sp-3) 0 0; font-size: 11.5px; color: var(--text-3); }
+.foot-note { margin: var(--sp-3) 0 0; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 </style>

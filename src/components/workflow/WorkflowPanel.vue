@@ -282,9 +282,8 @@ const pct = computed(() => wf.progress);
         </button>
         <button class="btn btn-primary start" type="button" @click="startRun">开始推进</button>
         <p class="hint">
-          推进过程中调用模型会产生费用。本次最多调用
-          <b>{{ app.settings.budget.maxCallsPerTask || 12 }}</b> 次，超出即停，不会偷偷继续。
-          预算上限在 设置 → 模型与检索 里改。
+          推进过程中调用模型会产生费用，按实际调用计。费用超过每日预算时会停下来问你，
+          预算在 设置 → 模型与检索 里改。
         </p>
       </section>
 
@@ -302,7 +301,7 @@ const pct = computed(() => wf.progress);
               </div>
               <div class="sum-meta">
                 {{ run!.steps.filter((s) => s.status === 'done').length }}/{{ run!.steps.length }} 步 ·
-                调用 {{ run!.calls }}/{{ run!.maxCalls }} 次 · {{ costText }}
+                调用 {{ run!.calls }} 次 · {{ costText }}
               </div>
               <!-- 当前这一步叫什么、已经跑了多久：不再只给一个百分比 -->
               <div v-if="currentStep && active" class="sum-now">
@@ -465,9 +464,9 @@ const pct = computed(() => wf.progress);
 .wf { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .head { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-5) var(--sp-5) var(--sp-3); }
 .head h2 { font-size: var(--fs-4); letter-spacing: -0.02em; margin: 2px 0 4px; }
-.eyebrow { font-size: 11px; color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; }
+.eyebrow { font-size: calc(11px * var(--font-scale)); color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; }
 .sub { font-size: var(--fs-2); color: var(--text-2); line-height: 1.7; max-width: 60ch; }
-.x { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--surface-2); color: var(--text-2); font-size: 20px; cursor: pointer; flex: 0 0 32px; }
+.x { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--surface-2); color: var(--text-2); font-size: calc(20px * var(--font-scale)); cursor: pointer; flex: 0 0 32px; }
 .x:hover { background: var(--surface-3); color: var(--text); }
 
 .body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--sp-5) var(--sp-8); }
@@ -480,20 +479,20 @@ const pct = computed(() => wf.progress);
   transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
 .scope b { font-size: var(--fs-2); font-weight: var(--fw-strong); }
-.scope span { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
+.scope span { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
 .scope:hover { border-color: var(--line-strong); }
 .scope.on { border-color: var(--primary); background: var(--primary-soft); }
 .start { margin-top: var(--sp-3); align-self: flex-start; }
-.hint { margin: var(--sp-3) 0 0; font-size: 11.5px; color: var(--text-3); line-height: 1.7; }
+.hint { margin: var(--sp-3) 0 0; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.7; }
 .hint b { color: var(--text-2); }
 
 .summary { padding: var(--sp-4); margin-bottom: var(--sp-3); }
 .sum-top { display: flex; align-items: flex-start; gap: var(--sp-3); }
 .sum-title { font-size: var(--fs-2); font-weight: var(--fw-strong); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.sum-meta { margin-top: 4px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.sum-meta { margin-top: 4px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .sum-now {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  margin-top: 8px; font-size: 11.5px; color: var(--text-2);
+  margin-top: 8px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-2);
 }
 .sum-now .mono { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .now-dot {
@@ -501,14 +500,14 @@ const pct = computed(() => wf.progress);
   background: var(--primary); animation: pulse 1.2s infinite ease-in-out;
 }
 .sum-pct { font-size: var(--fs-4); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; }
-.state { font-size: 10.5px; padding: 2px 8px; border-radius: var(--r-full); background: var(--surface-2); color: var(--text-2); font-weight: var(--fw-medium); }
+.state { font-size: calc(10.5px * var(--font-scale)); padding: 2px 8px; border-radius: var(--r-full); background: var(--surface-2); color: var(--text-2); font-weight: var(--fw-medium); }
 .state-running { background: var(--primary-soft); color: var(--primary); }
 .state-awaiting { background: var(--warn-soft, rgba(214, 158, 46, 0.14)); color: var(--warn); }
 .state-done { background: var(--ok-soft, rgba(46, 125, 50, 0.14)); color: var(--ok); }
 .state-failed { background: var(--danger-soft, rgba(198, 40, 40, 0.12)); color: var(--danger); }
 .bar { height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; margin: var(--sp-3) 0 0; }
 .bar i { display: block; height: 100%; background: var(--primary); transition: width var(--dur-3) var(--ease-out); }
-.msg { margin: var(--sp-3) 0 0; font-size: 11.5px; color: var(--text-2); line-height: 1.7; }
+.msg { margin: var(--sp-3) 0 0; font-size: calc(11.5px * var(--font-scale)); color: var(--text-2); line-height: 1.7; }
 .msg.err { color: var(--danger); }
 .actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
 
@@ -519,12 +518,12 @@ const pct = computed(() => wf.progress);
 .live-head {
   display: flex; align-items: center; gap: 8px; width: 100%;
   padding: 9px 12px; border: none; background: none; color: var(--text-2);
-  font: inherit; font-size: 12px; cursor: pointer; text-align: left;
+  font: inherit; font-size: calc(12px * var(--font-scale)); cursor: pointer; text-align: left;
 }
 .live-head b { font-weight: var(--fw-medium); }
-.live-spark { color: var(--text-3); font-size: 13px; line-height: 1; }
+.live-spark { color: var(--text-3); font-size: calc(13px * var(--font-scale)); line-height: 1; }
 .live-spark.spinning { color: var(--primary); animation: spin 3.2s linear infinite; }
-.live-note { font-size: 11px; color: var(--text-3); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.live-note { font-size: calc(11px * var(--font-scale)); color: var(--text-3); margin-left: 6px; font-variant-numeric: tabular-nums; }
 .live-chev { margin-left: auto; color: var(--text-3); transition: transform 240ms var(--ease-out); }
 .live-chev.shut { transform: rotate(-90deg); }
 .live-fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 260ms var(--ease-out); }
@@ -535,52 +534,52 @@ const pct = computed(() => wf.progress);
   display: flex; align-items: center; gap: 8px;
   padding: 6px 10px; margin-top: 4px;
   border-radius: var(--r-2); background: var(--surface-2);
-  font-size: 11.5px; color: var(--text-2);
+  font-size: calc(11.5px * var(--font-scale)); color: var(--text-2);
 }
 .live-group.cur .live-row { background: var(--surface); }
 .lr-mark {
   width: 16px; height: 16px; flex: 0 0 16px; border-radius: 50%;
-  display: grid; place-items: center; font-size: 10px;
+  display: grid; place-items: center; font-size: calc(10px * var(--font-scale));
   background: var(--surface-3); color: var(--text-3);
 }
 .live-row.done .lr-mark { background: var(--ok); color: #fff; }
 .live-row.failed .lr-mark { background: var(--danger); color: #fff; }
 .live-row.running .lr-mark { background: var(--primary-soft); color: var(--primary); }
 .lr-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lr-detail { margin-left: auto; flex: 0 0 auto; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.lr-detail { margin-left: auto; flex: 0 0 auto; font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .live-now {
   display: flex; align-items: center; gap: 7px;
-  padding: 2px 4px; font-size: 11.5px; color: var(--text-3);
+  padding: 2px 4px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3);
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .await { display: flex; gap: var(--sp-3); align-items: center; padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3); border-color: var(--primary); flex-wrap: wrap; }
 .await-t { font-size: var(--fs-2); font-weight: var(--fw-strong); }
-.await-d { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.await-d { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); margin-top: 2px; }
 .await-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .await-preview { width: 100%; margin-top: var(--sp-2); }
 .await-preview-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-  margin-bottom: 6px; font-size: 11.5px; color: var(--text-3);
+  margin-bottom: 6px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3);
 }
 .await-preview-body {
   padding: 10px 12px; border-radius: var(--r-2);
   background: var(--surface-2);
-  font-size: 12.5px; line-height: 1.8;
+  font-size: calc(12.5px * var(--font-scale)); line-height: 1.8;
   max-height: 300px; overflow-y: auto;
 }
 .edit-area { width: 100%; margin-top: var(--sp-2); }
 .edit-preview {
   margin-top: 10px; padding: 10px 12px;
   border-radius: var(--r-2); background: var(--surface-2);
-  font-size: 12.5px; line-height: 1.8;
+  font-size: calc(12.5px * var(--font-scale)); line-height: 1.8;
   max-height: 260px; overflow-y: auto;
 }
 .edit-preview-label {
-  margin-bottom: 6px; font-size: 10.5px; color: var(--text-3);
+  margin-bottom: 6px; font-size: calc(10.5px * var(--font-scale)); color: var(--text-3);
   letter-spacing: 0.04em;
 }
-.edit-hint { margin: 0 0 8px; font-size: 11.5px; line-height: 1.7; color: var(--text-3); }
+.edit-hint { margin: 0 0 8px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.7; color: var(--text-3); }
 .edit-area .textarea { width: 100%; min-height: 160px; resize: vertical; box-sizing: border-box; }
 .edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
@@ -591,7 +590,7 @@ const pct = computed(() => wf.progress);
 .step-head:hover { background: var(--surface-2); }
 .idx {
   width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%;
-  display: grid; place-items: center; font-size: 10.5px; font-variant-numeric: tabular-nums;
+  display: grid; place-items: center; font-size: calc(10.5px * var(--font-scale)); font-variant-numeric: tabular-nums;
   background: var(--surface-3); color: var(--text-2);
 }
 .dot-done .idx { background: var(--ok); color: #fff; }
@@ -599,28 +598,28 @@ const pct = computed(() => wf.progress);
 .dot-awaiting .idx { background: var(--warn); color: #fff; }
 .dot-failed .idx { background: var(--danger); color: #fff; }
 .name { font-size: var(--fs-2); font-weight: var(--fw-medium); }
-.tag { font-size: 10.5px; color: var(--text-3); margin-left: 8px; }
+.tag { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); margin-left: 8px; }
 .tag.mono { font-variant-numeric: tabular-nums; }
-.chev { color: var(--text-3); font-size: 16px; }
+.chev { color: var(--text-3); font-size: calc(16px * var(--font-scale)); }
 .step.open .chev { transform: rotate(90deg); }
 .step-body { padding: 0 var(--sp-3) var(--sp-3) 44px; }
 .meta-line {
   display: flex; flex-wrap: wrap; gap: 10px;
   margin-bottom: 8px;
-  font-size: 11px; color: var(--text-3);
+  font-size: calc(11px * var(--font-scale)); color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .out-md {
   padding: 10px 12px;
   border-radius: var(--r-2);
   background: var(--surface-2);
-  font-size: 12.5px; line-height: 1.8;
+  font-size: calc(12.5px * var(--font-scale)); line-height: 1.8;
   max-height: 340px; overflow-y: auto;
 }
-.err-line { margin: 8px 0 0; font-size: 11.5px; color: var(--danger); line-height: 1.7; }
-.warns { margin: 8px 0 0; padding-left: 18px; font-size: 11.5px; color: var(--warn); line-height: 1.7; }
+.err-line { margin: 8px 0 0; font-size: calc(11.5px * var(--font-scale)); color: var(--danger); line-height: 1.7; }
+.warns { margin: 8px 0 0; padding-left: 18px; font-size: calc(11.5px * var(--font-scale)); color: var(--warn); line-height: 1.7; }
 .step-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); flex-wrap: wrap; }
-.note { margin: var(--sp-4) 0 0; font-size: 11.5px; color: var(--text-3); line-height: 1.7; }
+.note { margin: var(--sp-4) 0 0; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.7; }
 
 @keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 html[data-motion='off'] .live-spark.spinning,

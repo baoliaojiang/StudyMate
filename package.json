@@ -1,9 +1,9 @@
 {
   "name": "studymate",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "private": false,
   "description": "研学帮 StudyMate — AI 研究性学习助手（第三方开源软件）",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "electron/main.cjs",
   "author": "研学帮 StudyMate",

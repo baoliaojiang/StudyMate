@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { useProjectStore } from '../stores/projects';
 import type { ResearchMode } from '../core/types';
+import { askConfirm } from '../core/task-guard';
 
 const app = useAppStore();
 const store = useProjectStore();
@@ -104,14 +105,17 @@ async function save() {
       form.recordTotal !== p.value.recordPlan.total || form.firstTerm !== p.value.recordPlan.firstTerm;
     if (planChanged) {
       const filled = store.records.filter((r) => r.goal.trim() || r.work.trim()).length;
-      if (
-        form.recordTotal < store.records.length &&
-        !confirm(
-          `篇数会从 ${store.records.length} 减到 ${form.recordTotal}，超出的记录会被删除（含已填的 ${filled} 篇中的一部分）。继续？`,
-        )
-      ) {
-        busy.value = false;
-        return;
+      if (form.recordTotal < store.records.length) {
+        const ok = await askConfirm({
+          title: '减少记录篇数',
+          message: `篇数会从 ${store.records.length} 减到 ${form.recordTotal}，超出的记录会被删除（含已填的 ${filled} 篇中的一部分）。继续？`,
+          confirmText: '仍然继续',
+          tone: 'warn',
+        });
+        if (!ok) {
+          busy.value = false;
+          return;
+        }
       }
       await store.applyRecordPlan({
         total: form.recordTotal,

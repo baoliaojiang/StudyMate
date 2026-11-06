@@ -185,7 +185,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
       startedAt: Date.now(),
       calls: 0,
       cost: 0,
-      maxCalls: Math.max(1, app.settings.budget.maxCallsPerTask || 12),
+      // 调用次数不再卡上限：只按费用预算与单步上限控制
+      maxCalls: Number.MAX_SAFE_INTEGER,
       maxCost: app.settings.budget.dailyCost || 0,
       confirmed: [],
       activities: [],

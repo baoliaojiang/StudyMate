@@ -7,6 +7,9 @@ import {
   reportToMarkdown,
 } from '../docx/builder';
 import { preflight, renderChecklist, summarizeChecks } from './preflight';
+import { downloadBlob } from './download';
+
+export { downloadBlob } from './download';
 
 export interface BundleInput {
   project: Project;
@@ -42,18 +45,6 @@ export function selectRecords(records: StudyRecord[], sel: ExportSelection = {})
       return true;
     })
     .sort((a, b) => a.index - b.index);
-}
-
-export function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 export function safeName(s: string): string {

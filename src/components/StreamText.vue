@@ -31,7 +31,7 @@ const animating = computed(() => props.animate && !long);
 <style scoped>
 .stream {
   margin: 0;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale));
   line-height: 1.75;
   color: var(--text);
   white-space: pre-wrap;

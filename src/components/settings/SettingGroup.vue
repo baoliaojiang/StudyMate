@@ -15,7 +15,7 @@ defineProps<{ title?: string; note?: string }>();
 .group { margin-bottom: 18px; }
 .group-title {
   margin: 0 0 8px 4px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--font-scale));
   font-weight: var(--fw-medium);
   color: var(--text-3);
   letter-spacing: 0.02em;
@@ -28,7 +28,7 @@ defineProps<{ title?: string; note?: string }>();
 }
 .group-note {
   margin: 8px 6px 0;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale));
   line-height: 1.65;
   color: var(--text-3);
 }

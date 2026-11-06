@@ -37,12 +37,12 @@ const emit = defineEmits<{ (e: 'back'): void }>();
 }
 .back:hover { background: var(--surface-3); }
 .back:active { transform: scale(0.94); }
-h1 { flex: 1; margin: 0; font-size: 17px; font-weight: var(--fw-strong); letter-spacing: -0.01em; }
+h1 { flex: 1; margin: 0; font-size: calc(17px * var(--font-scale)); font-weight: var(--fw-strong); letter-spacing: -0.01em; }
 .head-slot { min-width: 34px; display: inline-flex; justify-content: flex-end; }
-.subtitle { margin: 2px 0 18px; font-size: 12.5px; line-height: 1.7; color: var(--text-3); }
+.subtitle { margin: 2px 0 18px; font-size: calc(12.5px * var(--font-scale)); line-height: 1.7; color: var(--text-3); }
 .sub-body { display: flex; flex-direction: column; }
 @media (max-width: 700px) {
   .subpage { padding-bottom: 40px; }
-  h1 { font-size: 18px; text-align: center; }
+  h1 { font-size: calc(18px * var(--font-scale)); text-align: center; }
 }
 </style>

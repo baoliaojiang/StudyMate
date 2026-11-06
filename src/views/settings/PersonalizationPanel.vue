@@ -222,9 +222,9 @@ async function removePhrase(i: number) {
 </template>
 
 <style scoped>
-.note { margin: 0 4px; font-size: 11.5px; line-height: 1.75; color: var(--text-3); }
+.note { margin: 0 4px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.75; color: var(--text-3); }
 .mem { padding: 6px 14px 8px; }
-.mem-row { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.mem-row { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: calc(13px * var(--font-scale)); }
 .mem-row:last-child { border-bottom: none; }
 .mem-row span { color: var(--text-3); flex: 0 0 96px; }
 .mem-row b { flex: 1; font-weight: var(--fw-medium); word-break: break-word; }
@@ -238,7 +238,7 @@ async function removePhrase(i: number) {
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 .font-size b { font-weight: var(--fw-medium); line-height: 1; }
-.font-size span { font-size: 10.5px; color: var(--text-3); }
+.font-size span { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
 .font-size.on { background: var(--primary-soft, rgba(31, 79, 216, 0.12)); color: var(--primary); }
 .font-size.on span { color: var(--primary); }
 .speed-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px 14px 8px; }
@@ -249,15 +249,15 @@ async function removePhrase(i: number) {
   font: inherit; text-align: left; cursor: pointer;
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
-.speed b { font-size: 13px; font-weight: var(--fw-medium); }
-.speed span { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.speed b { font-size: calc(13px * var(--font-scale)); font-weight: var(--fw-medium); }
+.speed span { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .speed.on { background: var(--primary-soft, rgba(31, 79, 216, 0.12)); color: var(--text); }
 .speed.on b { color: var(--primary); }
 .add { display: flex; gap: 8px; padding: 14px; }
 .add .input { flex: 1; }
 .phrase {
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 14px; font-size: 13px; line-height: 1.6;
+  padding: 12px 14px; font-size: calc(13px * var(--font-scale)); line-height: 1.6;
 }
 .phrase + .phrase { border-top: 1px solid var(--line); }
 .phrase span { flex: 1; }
@@ -266,7 +266,7 @@ async function removePhrase(i: number) {
   border: none; border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer;
 }
 .del:hover { background: var(--surface-2); color: var(--danger, #c0392b); }
-.empty { padding: 22px 14px; text-align: center; font-size: 12.5px; color: var(--text-3); }
+.empty { padding: 22px 14px; text-align: center; font-size: calc(12.5px * var(--font-scale)); color: var(--text-3); }
 .switch { position: relative; display: inline-block; width: 44px; height: 26px; flex: 0 0 44px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .switch span { position: absolute; inset: 0; background: var(--surface-3); border-radius: var(--r-full); transition: background var(--dur-2); cursor: pointer; }

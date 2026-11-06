@@ -208,19 +208,19 @@ function cycleTheme() {
 .brand { display: flex; align-items: center; gap: 8px; padding: 2px 6px 2px; }
 .logo { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; display: block; }
 .brand-text { flex: 1; min-width: 0; }
-.brand-text b { display: block; font-size: 13.5px; font-weight: var(--fw-strong); line-height: 1.3; }
-.brand-text span { font-size: 10.5px; color: var(--text-3); }
+.brand-text b { display: block; font-size: calc(13.5px * var(--font-scale)); font-weight: var(--fw-strong); line-height: 1.3; }
+.brand-text span { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
 .pill {
   height: 24px; padding: 0 10px; border-radius: var(--r-full);
   border: 1px solid var(--line-strong); background: transparent;
-  color: var(--text-2); font-size: 11.5px; cursor: pointer;
+  color: var(--text-2); font-size: calc(11.5px * var(--font-scale)); cursor: pointer;
   transition: background var(--dur-2), color var(--dur-2);
 }
 .pill:hover { background: var(--surface); color: var(--text); }
 
 .me-head { display: flex; align-items: center; gap: 12px; padding: 4px 0 20px; }
 .me-avatar { width: 44px; height: 44px; padding: 0; border: none; background: transparent; border-radius: 50%; cursor: pointer; }
-.me-name { flex: 1; font-size: 19px; font-weight: var(--fw-strong); letter-spacing: -0.01em; }
+.me-name { flex: 1; font-size: calc(19px * var(--font-scale)); font-weight: var(--fw-strong); letter-spacing: -0.01em; }
 
 /* ---------- 导航 ---------- */
 .nav { display: flex; flex-direction: column; gap: 1px; }
@@ -230,12 +230,12 @@ function cycleTheme() {
   height: 34px; padding: 0 8px;
   border-radius: var(--r-1);
   color: var(--text-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 .nav-root.drawer .nav-item {
   height: 50px; padding: 0;
-  font-size: 16.5px; letter-spacing: -0.01em;
+  font-size: calc(16.5px * var(--font-scale)); letter-spacing: -0.01em;
   color: var(--text);
   border-radius: var(--r-1);
 }
@@ -246,7 +246,7 @@ function cycleTheme() {
 .ico { width: 20px; height: 20px; flex: 0 0 20px; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; color: currentColor; }
 .nav-root.drawer .ico { margin-right: 14px; color: var(--text-2); }
 .label { flex: 1; min-width: 0; }
-.hint { font-size: 10.5px; color: var(--text-3); opacity: 0; transition: opacity var(--dur-2); }
+.hint { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); opacity: 0; transition: opacity var(--dur-2); }
 .nav-item:hover .hint { opacity: 1; }
 
 /* ---------- 项目 ---------- */
@@ -255,16 +255,16 @@ function cycleTheme() {
 .sec-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 8px 6px;
-  font-size: 11px; color: var(--text-3); letter-spacing: 0.02em;
+  font-size: calc(11px * var(--font-scale)); color: var(--text-3); letter-spacing: 0.02em;
 }
-.nav-root.drawer .sec-head { padding: 0 0 12px; font-size: 15px; }
+.nav-root.drawer .sec-head { padding: 0 0 12px; font-size: calc(15px * var(--font-scale)); }
 .count { font-variant-numeric: tabular-nums; opacity: 0.7; }
 
 .rows { display: flex; flex-direction: column; gap: 1px; }
 .prow {
   display: flex; align-items: center; gap: 8px;
   height: 30px; padding: 0 8px; border-radius: var(--r-1);
-  color: var(--text-2); font-size: 12.5px;
+  color: var(--text-2); font-size: calc(12.5px * var(--font-scale));
 }
 .prow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prow:hover { background: var(--surface); color: var(--text); }
@@ -279,37 +279,37 @@ function cycleTheme() {
   height: 76px; border-radius: var(--r-2);
   background: var(--surface-2); border: 1px solid var(--line);
   display: grid; place-items: center;
-  color: var(--text-3); font-size: 22px; font-weight: var(--fw-strong);
+  color: var(--text-3); font-size: calc(22px * var(--font-scale)); font-weight: var(--fw-strong);
 }
-.ptitle { font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empty { margin: 0; padding: 2px 8px; font-size: 11.5px; color: var(--text-3); }
+.ptitle { font-size: calc(12.5px * var(--font-scale)); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { margin: 0; padding: 2px 8px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 
 /* ---------- 对话历史 ---------- */
 .mini {
   border: none; background: none; padding: 0;
-  font-size: 11px; color: var(--text-3); cursor: pointer;
+  font-size: calc(11px * var(--font-scale)); color: var(--text-3); cursor: pointer;
 }
 .mini:hover { color: var(--primary); }
-.nav-root.drawer .mini { font-size: 13px; }
+.nav-root.drawer .mini { font-size: calc(13px * var(--font-scale)); }
 .chats { display: flex; flex-direction: column; gap: 1px; }
 .chat-row {
   display: flex; align-items: baseline; gap: 8px;
   width: 100%; padding: 7px 8px;
   border: none; border-radius: var(--r-1);
   background: transparent; color: var(--text-2);
-  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+  font: inherit; font-size: calc(12.5px * var(--font-scale)); text-align: left; cursor: pointer;
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 .chat-row:hover { background: var(--surface); color: var(--text); }
 .chat-row.on { background: var(--surface-2); color: var(--text); }
-.nav-root.drawer .chat-row { padding: 11px 0; font-size: 14px; border-radius: 0; }
+.nav-root.drawer .chat-row { padding: 11px 0; font-size: calc(14px * var(--font-scale)); border-radius: 0; }
 .ctitle {
   flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ctime {
   flex: 0 0 auto;
-  font-size: 10.5px; color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale)); color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -326,13 +326,13 @@ function cycleTheme() {
 }
 .tile:hover { border-color: var(--line-strong); }
 .tile:active { transform: scale(0.98); }
-.tile b { font-size: 11.5px; font-weight: var(--fw-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.tile span { font-size: 10px; color: var(--text-3); }
+.tile b { font-size: calc(11.5px * var(--font-scale)); font-weight: var(--fw-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.tile span { font-size: calc(10px * var(--font-scale)); color: var(--text-3); }
 
 .nav-root.drawer .tiles { gap: 10px; }
 .nav-root.drawer .tile { height: 68px; padding: 0 12px; border-radius: var(--r-2); gap: 3px; }
-.nav-root.drawer .tile b { font-size: 14px; }
-.nav-root.drawer .tile span { font-size: 11.5px; }
+.nav-root.drawer .tile b { font-size: calc(14px * var(--font-scale)); }
+.nav-root.drawer .tile span { font-size: calc(11.5px * var(--font-scale)); }
 
 /* ---------- 底部 ---------- */
 .bottom { margin-top: auto; display: flex; align-items: center; gap: 10px; padding-top: 14px; }
@@ -342,12 +342,12 @@ function cycleTheme() {
   padding: 0 12px;
   border: 1px solid var(--line); border-radius: var(--r-full);
   background: var(--surface-2); color: var(--text-3);
-  font: inherit; font-size: 12.5px; cursor: pointer;
+  font: inherit; font-size: calc(12.5px * var(--font-scale)); cursor: pointer;
   transition: border-color var(--dur-2), background var(--dur-2);
 }
 .search:hover { border-color: var(--line-strong); background: var(--surface); }
 .ph { flex: 1; text-align: left; }
-.nav-root.drawer .search { height: 44px; font-size: 15px; padding: 0 18px; gap: 10px; }
+.nav-root.drawer .search { height: 44px; font-size: calc(15px * var(--font-scale)); padding: 0 18px; gap: 10px; }
 .circle {
   width: 36px; height: 36px; flex: 0 0 36px;
   display: grid; place-items: center;

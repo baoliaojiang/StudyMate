@@ -585,6 +585,11 @@ export interface AppSettings {
   /** 状态栏额外留白（px）：部分机型 env() 返回 0，顶栏会压到状态栏下面，用户可手动补 */
   safeTopPad?: number;
   devMode: boolean;
+  /**
+   * 全自动工作流（项目自动推进）。默认关闭：主路径是「研究记录」逐篇生成与导出。
+   * 开启前必须过一段风险确认，界面标注「不推荐 · 即将下线」。
+   */
+  advancedWorkflow?: boolean;
   /** 已确认免责声明（三份文档全部勾选后为 true） */
   disclaimerAccepted: boolean;
   /** 三份文档各自的确认记录 */

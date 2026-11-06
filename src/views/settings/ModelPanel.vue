@@ -12,6 +12,7 @@ import { uid } from '../../core/id';
 import type { ProviderKind } from '../../core/types';
 import SettingGroup from '../../components/settings/SettingGroup.vue';
 import SubPage from '../../components/settings/SubPage.vue';
+import { askConfirm, askPrompt } from '../../core/task-guard';
 
 const app = useAppStore();
 const router = useRouter();
@@ -184,7 +185,10 @@ async function refreshModels(p: ProviderRow) {
 }
 
 async function addManualModel(p: ProviderRow) {
-  const name = prompt('输入模型名称（与服务商文档一致）');
+  const name = await askPrompt({
+    title: '输入模型名称',
+    message: '与服务商文档一致',
+  });
   if (!name?.trim()) return;
   if (p.models.some((m) => m.name === name.trim())) {
     app.toast('已存在', 'warn');
@@ -203,7 +207,13 @@ async function setDefault(p: ProviderRow, model: string) {
 }
 
 async function removeProvider(id: string) {
-  if (!confirm('删除这个服务商配置？API Key 也会一并删除。')) return;
+  const ok = await askConfirm({
+    title: '删除服务商配置',
+    message: '删除这个服务商配置？API Key 也会一并删除。',
+    confirmText: '删除',
+    tone: 'warn',
+  });
+  if (!ok) return;
   await db.providers.delete(id);
   await loadProviders();
   if (editing.value?.id === id) editing.value = null;
@@ -363,34 +373,34 @@ const hasModels = computed(() => providers.value.some((p) => p.models.length > 0
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3);
 }
 .usage div { display: flex; flex-direction: column; gap: 3px; }
-.usage b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.usage span { font-size: 11px; color: var(--text-3); }
+.usage b { font-size: calc(17px * var(--font-scale)); font-variant-numeric: tabular-nums; }
+.usage span { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 
 .providers { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
 .preset-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .preset {
   padding: 6px 11px; border-radius: var(--r-full); border: 1px dashed var(--line-strong);
-  background: transparent; color: var(--text-2); font-size: 11.5px; cursor: pointer;
+  background: transparent; color: var(--text-2); font-size: calc(11.5px * var(--font-scale)); cursor: pointer;
   transition: border-color var(--dur-2), color var(--dur-2), background var(--dur-2);
 }
 .preset:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft, rgba(31,79,216,0.06)); }
 .prov { padding: 13px 14px; border-radius: var(--r-2); background: var(--surface-2); border: 1px solid var(--line); }
-.chip { font-size: 10px; padding: 2px 6px; margin-left: 8px; border-radius: var(--r-full); background: var(--surface-3); color: var(--text-3); }
+.chip { font-size: calc(10px * var(--font-scale)); padding: 2px 6px; margin-left: 8px; border-radius: var(--r-full); background: var(--surface-3); color: var(--text-3); }
 .models { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
 .model-chip {
   padding: 4px 9px; border-radius: var(--r-full); border: 1px solid var(--line);
-  background: var(--surface); font-size: 11px; color: var(--text-2); cursor: pointer;
+  background: var(--surface); font-size: calc(11px * var(--font-scale)); color: var(--text-2); cursor: pointer;
 }
 .model-chip.on { border-color: var(--primary); color: var(--primary); background: var(--primary-soft, rgba(31,79,216,0.08)); }
 .model-chip.add { border-style: dashed; color: var(--text-3); }
 .model-chip i { font-style: normal; opacity: 0.55; margin-left: 2px; }
 
 .form { margin-bottom: 18px; background: var(--surface); }
-.form-title { font-size: 13.5px; font-weight: 640; margin-bottom: 12px; }
+.form-title { font-size: calc(13.5px * var(--font-scale)); font-weight: 640; margin-bottom: 12px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.field-label { font-size: 12px; color: var(--text-3); }
-.check-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+.field-label { font-size: calc(12px * var(--font-scale)); color: var(--text-3); }
+.check-row { display: flex; align-items: center; gap: 9px; font-size: calc(12.5px * var(--font-scale)); color: var(--text-2); cursor: pointer; }
 .cb { width: 17px; height: 17px; accent-color: var(--primary); }
 .card-pad-inner { padding: 14px 16px; }
 .search-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }

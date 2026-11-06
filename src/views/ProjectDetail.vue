@@ -12,6 +12,7 @@ import MarkdownText from '../components/MarkdownText.vue';
 import { exportBundle, exportOne, type ExportSelection } from '../export/bundle';
 import { countChecks, preflight, type DeliveryCheck } from '../export/preflight';
 import { MODE_ENTRY } from '../agents/definitions';
+import { currentReportKind } from '../workflow/graph';
 import WorkflowPanel from '../components/workflow/WorkflowPanel.vue';
 import type { ReportKind, ReportStatus } from '../core/types';
 import { useWorkflowStore } from '../workflow/runner';
@@ -53,8 +54,15 @@ function openWorkflow(scope: 'report' | 'stage' | 'project') {
   workflowOpen.value = true;
 }
 
-/** 关面板也算「退出」：还在推进/等确认/暂停时先说明会暂停、会丢什么 */
-async function closeWorkflow(): Promise<boolean> {
+/**
+ * 关面板也算「退出」：还在推进/等确认/暂停时先说明会暂停、会丢什么。
+ * silent = 从面板里主动跳去别的页（如确认来源 → 来源页），这不是退出，不该弹确认。
+ */
+async function closeWorkflow(silent = false): Promise<boolean> {
+  if (silent) {
+    workflowOpen.value = false;
+    return true;
+  }
   const r = wf.run;
   const live = !!r && ['running', 'paused', 'awaiting'].includes(r.status);
   if (live) {
@@ -78,7 +86,7 @@ async function closeWorkflow(): Promise<boolean> {
 }
 
 async function onGoto(t: 'sources' | 'records' | 'members') {
-  if (!(await closeWorkflow())) return;
+  if (!(await closeWorkflow(true))) return;
   tab.value = t;
 }
 
@@ -148,6 +156,29 @@ const doneCount = computed(() => store.reportStatuses.filter((r) => r.status ===
  * 这样有会话记录、有历史可翻、也不会和手机状态栏打架；
  * 执行过程（哪几步、每步结果）直接在消息里一条条显示。
  */
+/** 现在该做什么：默认只给「逐篇」的路子；全自动工作流要显式开启才出现 */
+const todoEntries = computed(() => {
+  const base = [
+    { k: 'assistant', t: '智能规划', d: '看现在的进度，给出下一步' },
+    { k: 'research', t: '资料研究', d: '找文献与网页，补进来源表' },
+    { k: 'divide', t: '任务分工', d: '把阶段任务分到人头上' },
+    { k: 'generate', t: '写报告', d: '进报告页逐节写、逐节核对' },
+    { k: 'review', t: '内容审核', d: '查虚构内容与引用风险' },
+    { k: 'format', t: '格式检查', d: '查章节、字数、图表编号' },
+  ];
+  if (app.settings.advancedWorkflow) {
+    base.push({ k: 'workflow', t: '项目自动推进 · 不推荐', d: '即将下线：一口气跑完，正文仍需自己核对' });
+  }
+  return base;
+});
+
+/** 写报告：直接进当前那份报告的编辑页，不再走工作流面板 */
+function openCurrentReport() {
+  if (!p.value) return;
+  const kind = currentReportKind(store.reports);
+  tab.value = kind === 'proposal' ? 'proposal' : kind === 'midterm' ? 'midterm' : 'final';
+}
+
 function runEntry(key: keyof typeof MODE_ENTRY) {
   if (!p.value) return;
   if (app.settings.minor.enabled && app.settings.minor.limitAi) {
@@ -305,22 +336,14 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
         <div class="card card-pad">
           <div class="card-label">现在该做什么</div>
           <div
-            v-for="entry in [
-              { k: 'assistant', t: '智能规划', d: '看现在的进度，给出下一步' },
-              { k: 'research', t: '资料研究', d: '找文献与网页，补进来源表' },
-              { k: 'divide', t: '任务分工', d: '把阶段任务分到人头上' },
-              { k: 'generate', t: '报告生成', d: '按学校表格逐节写' },
-              { k: 'review', t: '内容审核', d: '查虚构内容与引用风险' },
-              { k: 'format', t: '格式检查', d: '查章节、字数、图表编号' },
-              { k: 'workflow', t: '项目自动推进', d: '从分析课题一路推到导出' },
-            ]"
+            v-for="entry in todoEntries"
             :key="entry.k"
             class="todo"
             @click="
               entry.k === 'workflow'
                 ? openWorkflow('project')
                 : entry.k === 'generate'
-                  ? openWorkflow('report')
+                  ? openCurrentReport()
                   : runEntry(entry.k as any)
             "
           >
@@ -475,7 +498,7 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 }
 .back:hover { background: var(--surface-3); }
 .ptitle { font-size: var(--fs-4); letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pmeta { display: flex; align-items: center; gap: 7px; margin-top: 6px; font-size: 11.5px; color: var(--text-3); flex-wrap: wrap; }
+.pmeta { display: flex; align-items: center; gap: 7px; margin-top: 6px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); flex-wrap: wrap; }
 .pmeta i { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); opacity: 0.5; }
 
 /* 四大报告状态条 */
@@ -494,7 +517,7 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text-3);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   cursor: pointer;
   white-space: nowrap;
   transition: border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
@@ -503,7 +526,7 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 .st.on { border-color: var(--text); color: var(--text); }
 .st-dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 6px; background: var(--line-strong); }
 .st-name { color: inherit; }
-.st-val { font-size: 11px; opacity: 0.78; }
+.st-val { font-size: calc(11px * var(--font-scale)); opacity: 0.78; }
 .st.s-draft .st-dot { background: var(--warn); }
 .st.s-review .st-dot { background: var(--primary); }
 .st.s-confirmed .st-dot { background: var(--ok); }
@@ -544,7 +567,7 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
 .tab-dot.s-draft { background: var(--warn); }
 .tab-dot.s-review { background: var(--primary); }
 .tab-dot.s-confirmed { background: var(--ok); }
-.tabs-count { flex: 0 0 auto; font-size: 11.5px; color: var(--text-3); }
+.tabs-count { flex: 0 0 auto; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 .tabs-count b { color: var(--text); font-weight: var(--fw-strong); }
 
 .pane { padding: var(--sp-4) var(--sp-5) var(--sp-10); }
@@ -582,8 +605,8 @@ html[data-motion='off'] .wf-leave-active { transition: none; }
 .todo:last-child { border-bottom: none; }
 .todo:hover .todo-t { color: var(--primary); }
 .todo-t { font-size: var(--fs-2); font-weight: var(--fw-strong); transition: color var(--dur-2) var(--ease-out); }
-.todo-d { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
-.arrow { color: var(--text-3); font-size: 18px; }
+.todo-d { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); margin-top: 2px; }
+.arrow { color: var(--text-3); font-size: calc(18px * var(--font-scale)); }
 
 /* 四份材料 */
 .rpt-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); }
@@ -595,9 +618,9 @@ html[data-motion='off'] .wf-leave-active { transition: none; }
   transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
 }
 .rpt-tile:hover { background: var(--surface-3); transform: translateY(-1px); }
-.rpt-tile-name { font-size: 11.5px; color: var(--text-3); }
+.rpt-tile-name { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 .rpt-tile-val { font-size: var(--fs-2); font-weight: var(--fw-strong); }
-.rpt-tile-meta { font-size: 10.5px; color: var(--text-3); }
+.rpt-tile-meta { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
 .rpt-tile.s-draft .rpt-tile-val { color: var(--warn); }
 .rpt-tile.s-review .rpt-tile-val { color: var(--primary); }
 .rpt-tile.s-confirmed .rpt-tile-val { color: var(--ok); }
@@ -618,26 +641,26 @@ html[data-motion='off'] .wf-leave-active { transition: none; }
 }
 .exp:hover { background: var(--surface-3); transform: translateY(-1px); }
 .exp b { font-size: var(--fs-2); }
-.exp span { font-size: 11.5px; color: var(--text-3); }
+.exp span { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 
 /* 折叠面板：Grid 0fr → 1fr，不写 JS 量高 */
 .fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-3) var(--ease-out); }
 .fold.open { grid-template-rows: 1fr; }
 .fold-in { overflow: hidden; min-height: 0; }
 
-.zip-box { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 2px 2px; font-size: 12.5px; }
+.zip-box { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 2px 2px; font-size: calc(12.5px * var(--font-scale)); }
 .zip-pick { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); cursor: pointer; }
 .zip-pick input { accent-color: var(--primary); }
 .zip-select {
   border: none; border-radius: var(--r-1);
   background: var(--surface-2); color: var(--text);
-  font: inherit; font-size: 12.5px; padding: 5px 8px;
+  font: inherit; font-size: calc(12.5px * var(--font-scale)); padding: 5px 8px;
 }
 
 .check-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-.check-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.65; }
+.check-list li { display: flex; align-items: flex-start; gap: 8px; font-size: calc(12px * var(--font-scale)); line-height: 1.65; }
 .check-list b {
-  flex: 0 0 auto; font-size: 10.5px; font-weight: var(--fw-medium);
+  flex: 0 0 auto; font-size: calc(10.5px * var(--font-scale)); font-weight: var(--fw-medium);
   padding: 1px 6px; border-radius: var(--r-full);
 }
 .check-list li.block b { background: rgba(192, 57, 43, 0.12); color: var(--danger, #c0392b); }
@@ -648,7 +671,7 @@ html[data-motion='off'] .wf-leave-active { transition: none; }
 .run-steps {
   list-style: none; margin: 0 0 14px; padding: 10px 12px;
   border-radius: var(--r-2); background: var(--surface-2);
-  display: flex; flex-direction: column; gap: 7px; font-size: 12px;
+  display: flex; flex-direction: column; gap: 7px; font-size: calc(12px * var(--font-scale));
 }
 .run-steps li { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
 .rs-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: 0 0 7px; }
@@ -657,7 +680,7 @@ html[data-motion='off'] .wf-leave-active { transition: none; }
 .run-steps li.done .rs-dot { background: var(--ok); }
 .run-steps li.failed .rs-dot { background: var(--danger); }
 .rs-label { flex: 1; min-width: 0; }
-.rs-note { font-size: 11px; opacity: 0.8; }
+.rs-note { font-size: calc(11px * var(--font-scale)); opacity: 0.8; }
 
 @media (max-width: 860px) {
   .phead { padding: var(--sp-3) var(--sp-4) var(--sp-2); }

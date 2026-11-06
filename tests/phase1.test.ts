@@ -60,7 +60,9 @@ describe('法务文本', () => {
 
     expect(all(privacy)).toContain('本机');
     expect(all(privacy)).toContain('IndexedDB');
-    expect(all(terms)).toContain('MIT');
+    expect(all(terms)).toContain('需先取得授权');
+    // 许可已改成「学习免费、商用与分发需授权」，条款里不能再留「MIT 开源可自由再分发」
+    expect(all(terms)).not.toContain('以 MIT 许可证开源');
     expect(all(statement)).toContain('（AI 模拟示例）');
     expect(all(statement)).toContain('不代表');
   });

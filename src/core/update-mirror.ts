@@ -104,6 +104,12 @@ export function hostOf(url: string): string {
 
 /* ---------------------- GitHub Releases 版本查询 ---------------------- */
 
+export interface ReleaseAsset {
+  name: string;
+  /** assets[].browser_download_url：安装包的直链 */
+  url: string;
+}
+
 export interface ReleaseInfo {
   /** 原始 tag，如 v1.0.12 */
   tag: string;
@@ -113,6 +119,10 @@ export interface ReleaseInfo {
   htmlUrl: string;
   publishedAt: string;
   name?: string;
+  /** Release 说明的 Markdown 原文，供启动更新弹窗展示 */
+  body?: string;
+  /** 附件直链，供「去更新」按平台挑安装包 */
+  assets?: ReleaseAsset[];
 }
 
 const RELEASE_TIMEOUT_MS = 6500;
@@ -165,9 +175,23 @@ export async function fetchLatestRelease(
       html_url?: unknown;
       published_at?: unknown;
       name?: unknown;
+      body?: unknown;
+      assets?: unknown;
     };
     const tag = typeof data.tag_name === 'string' ? data.tag_name.trim() : '';
     if (!tag) return null;
+
+    const assets: ReleaseAsset[] = [];
+    if (Array.isArray(data.assets)) {
+      for (const raw of data.assets) {
+        if (!raw || typeof raw !== 'object') continue;
+        const item = raw as { name?: unknown; browser_download_url?: unknown };
+        if (typeof item.name === 'string' && typeof item.browser_download_url === 'string') {
+          assets.push({ name: item.name, url: item.browser_download_url });
+        }
+      }
+    }
+
     return {
       tag,
       version: tag.replace(/^v/i, ''),
@@ -177,6 +201,8 @@ export async function fetchLatestRelease(
           : `${githubRepo.replace(/\/$/, '')}/releases`,
       publishedAt: typeof data.published_at === 'string' ? data.published_at : '',
       name: typeof data.name === 'string' ? data.name : undefined,
+      body: typeof data.body === 'string' ? data.body : '',
+      assets,
     };
   } catch {
     return null;

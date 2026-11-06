@@ -891,7 +891,7 @@ async function finish(to?: string) {
 }
 .welcome-lede {
   margin: 10px 0 0;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale));
   line-height: 1.85;
   color: var(--text-3);
   animation: w-rise var(--dur-4) var(--ease-out) 150ms both;
@@ -900,7 +900,7 @@ async function finish(to?: string) {
 .welcome-legal {
   margin: 12px 0 0;
   text-align: center;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--font-scale));
   color: var(--text-3);
 }
 @keyframes w-rise {
@@ -931,10 +931,10 @@ async function finish(to?: string) {
   height: 100%; background: var(--primary); border-radius: var(--r-full);
   transition: width var(--dur-4) var(--ease-out);
 }
-.step-no { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.step-no { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .skip {
   border: none; background: none; padding: 4px 2px 4px 10px;
-  font-size: 12.5px; color: var(--text-3); cursor: pointer;
+  font-size: calc(12.5px * var(--font-scale)); color: var(--text-3); cursor: pointer;
   transition: color var(--dur-2) var(--ease-out);
 }
 .skip:hover { color: var(--text); }
@@ -946,7 +946,7 @@ async function finish(to?: string) {
   background: var(--surface);
 }
 .inline-msg {
-  margin: 0; font-size: 11.5px; line-height: 1.65; color: var(--text-3);
+  margin: 0; font-size: calc(11.5px * var(--font-scale)); line-height: 1.65; color: var(--text-3);
 }
 .inline-msg.ok { color: var(--ok); }
 .inline-msg.fail { color: var(--danger); }
@@ -961,8 +961,8 @@ async function finish(to?: string) {
   transition: background var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 .mode-card.on { background: var(--surface-2); box-shadow: 0 0 0 1.5px var(--line-strong); }
-.mode-card b { font-size: 14px; color: var(--text); }
-.mode-card span { font-size: 12px; line-height: 1.7; color: var(--text-3); }
+.mode-card b { font-size: calc(14px * var(--font-scale)); color: var(--text); }
+.mode-card span { font-size: calc(12px * var(--font-scale)); line-height: 1.7; color: var(--text-3); }
 
 /* 自定义：逐项勾选，实底分层，不用第二个浮层 */
 .cust-box { margin-top: 12px; display: flex; flex-direction: column; }
@@ -979,11 +979,11 @@ async function finish(to?: string) {
 .cust-row input:focus-visible { outline: none; border-radius: 4px; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary-soft); }
 .cust-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cust-text b { font-size: var(--fs-1); font-weight: var(--fw-medium); color: var(--text); }
-.cust-text span { font-size: 10.5px; line-height: 1.6; color: var(--text-3); }
+.cust-text span { font-size: calc(10.5px * var(--font-scale)); line-height: 1.6; color: var(--text-3); }
 
 .ghost-skip {
   width: 100%; margin-top: 8px; border: none; background: none;
-  font-size: 12px; color: var(--text-3); cursor: pointer; padding: 6px;
+  font-size: calc(12px * var(--font-scale)); color: var(--text-3); cursor: pointer; padding: 6px;
 }
 .ghost-skip:hover { color: var(--text-2); }
 
@@ -993,7 +993,7 @@ async function finish(to?: string) {
   display: flex; flex-direction: column; overflow-y: auto;
 }
 .crumb {
-  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: calc(11px * var(--font-scale)); letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text-3); margin: 0 0 var(--sp-4);
 }
 .screen { display: flex; flex-direction: column; }
@@ -1019,7 +1019,7 @@ async function finish(to?: string) {
   text-align: center; display: flex; flex-direction: column; gap: 2px;
 }
 .facts b { font-size: var(--fs-4); line-height: 1.2; letter-spacing: -0.02em; }
-.facts span { font-size: 11.5px; color: var(--text-3); }
+.facts span { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 
 .note { font-size: var(--fs-1); color: var(--text-3); line-height: 1.72; margin: var(--sp-2) 0 0; }
 
@@ -1049,12 +1049,12 @@ async function finish(to?: string) {
 .doc-card b { display: block; font-size: var(--fs-1); color: var(--text); margin-bottom: 6px; }
 .doc-card dl { margin: 0; display: flex; flex-direction: column; gap: 5px; }
 .doc-card dl > div { display: flex; flex-direction: column; gap: 1px; }
-.doc-card dt { font-size: 10.5px; color: var(--text-3); }
-.doc-card dd { margin: 0; font-size: 11.5px; line-height: 1.7; color: var(--text-2); }
+.doc-card dt { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
+.doc-card dd { margin: 0; font-size: calc(11.5px * var(--font-scale)); line-height: 1.7; color: var(--text-2); }
 
 .read-hint {
   margin: var(--sp-3) 0 0;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale));
   color: var(--text-3);
   display: flex; align-items: center; gap: 6px;
 }
@@ -1167,7 +1167,7 @@ async function finish(to?: string) {
   width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--primary-soft); color: var(--primary);
-  font-size: 11.5px; font-weight: var(--fw-strong); margin-top: 1px;
+  font-size: calc(11.5px * var(--font-scale)); font-weight: var(--fw-strong); margin-top: 1px;
 }
 .how b { font-size: var(--fs-2); font-weight: var(--fw-strong); }
 .how p { font-size: var(--fs-1); color: var(--text-2); line-height: 1.7; margin: 4px 0 0; }
@@ -1197,8 +1197,8 @@ async function finish(to?: string) {
   background: var(--bg); border-top: 1px solid var(--line);
 }
 .actions .btn { min-height: 48px; }
-.block-hint { margin: 0; text-align: center; font-size: 11.5px; color: var(--warn); }
-.legal { margin: 0; text-align: center; font-size: 10.5px; color: var(--text-3); letter-spacing: 0.02em; }
+.block-hint { margin: 0; text-align: center; font-size: calc(11.5px * var(--font-scale)); color: var(--warn); }
+.legal { margin: 0; text-align: center; font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); letter-spacing: 0.02em; }
 
 .slide-next-enter-active,
 .slide-next-leave-active,
@@ -1219,6 +1219,6 @@ async function finish(to?: string) {
 @media (max-width: 480px) {
   .stage { padding: var(--sp-4) var(--sp-4) var(--sp-3); }
   .actions { padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + var(--safe-bottom, env(safe-area-inset-bottom, 0px))); }
-  .display { font-size: 30px; }
+  .display { font-size: calc(30px * var(--font-scale)); }
 }
 </style>

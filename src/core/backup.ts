@@ -11,6 +11,7 @@
 
 import { db } from './db';
 import { maskKey, open_, openWithPassphrase, seal, sealWithPassphrase } from './crypto';
+import { downloadBlob } from '../export/download';
 import type {
   ActivityRecord,
   AppSettings,
@@ -74,6 +75,8 @@ export interface BackupCounts {
   providers: number;
   localFiles?: number;
   workflowRuns?: number;
+  /** 换过设备/密钥后解不开的 Key 条数：备份里留空，界面必须提示用户重填 */
+  skippedKeys?: number;
 }
 
 /** 导出：返回可直接下载的 JSON 文本（整体加密）。onStage 供界面显示当前阶段 */
@@ -88,7 +91,16 @@ export async function exportAllData(
   onStage?.('正在读取本机数据…');
   const providerRows = await db.providers.toArray();
   const providers: ProviderBackup[] = [];
+  let skippedKeys = 0;
   for (const p of providerRows) {
+    // 单条 Key 解不开（换过设备、历史明文格式、密钥库被清过）不能拖垮整份备份。
+    // 留空并在界面上如实报条数，让用户自己重填，绝不编一个假 Key 进去。
+    let apiKey = '';
+    try {
+      apiKey = await open_(p.apiKeySealed);
+    } catch {
+      skippedKeys += 1;
+    }
     providers.push({
       id: p.id,
       kind: p.kind,
@@ -101,7 +113,7 @@ export async function exportAllData(
       maxRetries: p.maxRetries,
       createdAt: p.createdAt,
       fallbackOf: p.fallbackOf,
-      apiKey: await open_(p.apiKeySealed),
+      apiKey,
     });
   }
 
@@ -137,6 +149,7 @@ export async function exportAllData(
       providers: providers.length,
       localFiles: payload.localFiles?.length ?? 0,
       workflowRuns: payload.workflowRuns?.length ?? 0,
+      skippedKeys,
     },
     // 密文信封：{ v, salt, iv, data }
     data: sealed,
@@ -172,6 +185,30 @@ export async function importAllData(text: string, passphrase: string): Promise<I
     throw new Error('口令错误，或文件已损坏');
   }
   if (!Array.isArray(payload.projects)) throw new Error('备份内容不完整');
+
+  // 关键：Key 的重新封装必须在 Dexie 事务之外做完。
+  // seal() 会打开另一个 IndexedDB 库并 await WebCrypto，放在事务里会让事务
+  // 提前失效（表现为「恢复点了没反应 / 提示失败」）。事务里只留纯 Dexie 写操作。
+  const providerRows: ProviderRow[] = [];
+  for (const p of payload.providers ?? []) {
+    const key = p.apiKey ?? '';
+    providerRows.push({
+      id: p.id,
+      kind: p.kind,
+      label: p.label,
+      baseUrl: p.baseUrl,
+      models: p.models ?? [],
+      defaultModel: p.defaultModel,
+      supportsModelList: p.supportsModelList,
+      timeoutMs: p.timeoutMs,
+      maxRetries: p.maxRetries,
+      createdAt: p.createdAt,
+      fallbackOf: p.fallbackOf,
+      apiKeySealed: await seal(key),
+      apiKeyPreview: maskKey(key),
+      apiKeyLen: key.length,
+    });
+  }
 
   await db.transaction(
     'rw',
@@ -225,27 +262,7 @@ export async function importAllData(text: string, passphrase: string): Promise<I
       if (payload.workflows?.length) await db.workflows.bulkAdd(payload.workflows);
       if (payload.localFiles?.length) await db.localFiles.bulkAdd(payload.localFiles);
       if (payload.workflowRuns?.length) await db.workflowRuns.bulkAdd(payload.workflowRuns);
-
-      for (const p of payload.providers ?? []) {
-        const key = p.apiKey ?? '';
-        const row: ProviderRow = {
-          id: p.id,
-          kind: p.kind,
-          label: p.label,
-          baseUrl: p.baseUrl,
-          models: p.models ?? [],
-          defaultModel: p.defaultModel,
-          supportsModelList: p.supportsModelList,
-          timeoutMs: p.timeoutMs,
-          maxRetries: p.maxRetries,
-          createdAt: p.createdAt,
-          fallbackOf: p.fallbackOf,
-          apiKeySealed: await seal(key),
-          apiKeyPreview: maskKey(key),
-          apiKeyLen: key.length,
-        };
-        await db.providers.put(row);
-      }
+      if (providerRows.length) await db.providers.bulkAdd(providerRows);
     },
   );
 
@@ -261,13 +278,10 @@ export async function importAllData(text: string, passphrase: string): Promise<I
   };
 }
 
-/** 触发浏览器下载 */
+/** 触发浏览器下载（a 必须挂进 DOM，否则部分浏览器会静默丢弃） */
 export function downloadBackup(text: string, name?: string) {
-  const blob = new Blob([text], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name ?? `studymate-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
+  downloadBlob(
+    new Blob([text], { type: 'application/json;charset=utf-8' }),
+    name ?? `studymate-backup-${new Date().toISOString().slice(0, 10)}.json`,
+  );
 }

@@ -114,6 +114,8 @@ export async function open_(sealed: Sealed | string | undefined): Promise<string
 /* ------------------------------------------------------------------ */
 
 async function deriveFromPassphrase(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+  // 必须是 WebCrypto 规定的算法名 PBKDF2；写错会直接抛 NotSupportedError，
+  // 表现为「备份导不出来 / 恢复永远提示口令错误」。
   const base = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, [
     'deriveKey',
   ]);

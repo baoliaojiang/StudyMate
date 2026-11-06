@@ -16,6 +16,12 @@ export const router = createRouter({
     { path: '/project/:id', name: 'project', component: () => import('../views/ProjectDetail.vue') },
     // 答辩演示稿：从项目页进下一层，返回时走反向转场
     { path: '/deck/:id', name: 'deck', component: () => import('../views/PptStudio.vue') },
+    // 单篇研究记录：独立页面，不再是抽屉
+    {
+      path: '/project/:id/records/:index',
+      name: 'record',
+      component: () => import('../views/RecordEdit.vue'),
+    },
     // 设置二级页走同一路由的可选参数，手机返回键与桌面浏览器后退行为一致
     { path: '/settings/:tab?', name: 'settings', component: () => import('../views/Settings.vue') },
     { path: '/dev', name: 'dev', component: () => import('../views/DevPanel.vue') },

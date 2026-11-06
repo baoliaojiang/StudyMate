@@ -1,6 +1,7 @@
 import type { AiGateway, ChatRequest } from './gateway';
 import { BudgetConfirmRequiredError } from './gateway';
 import type { ChatResult } from './types';
+import { askConfirm } from '../core/task-guard';
 
 /**
  * 带预算确认的调用。
@@ -20,13 +21,14 @@ export async function chatWithBudgetConfirm(gw: AiGateway, req: ChatRequest): Pr
       `${e.message}。`,
       '继续调用将产生额外费用，是否继续？',
     ].join('\n');
-    // 安卓 WebView 里 window.confirm 可能被拦掉或阻塞，这里必须兜住，否则界面会一直转圈
-    let ok = false;
-    try {
-      ok = typeof window !== 'undefined' && typeof window.confirm === 'function' ? window.confirm(detail) : false;
-    } catch {
-      ok = false;
-    }
+    // 用应用内弹层确认：安卓 WebView 里系统 confirm 会被拦掉，界面会一直转圈
+    const ok = await askConfirm({
+      title: '继续调用会产生额外费用',
+      message: detail,
+      confirmText: '仍然继续',
+      cancelText: '先不调用',
+      tone: 'warn',
+    });
     if (!ok) throw e;
     return gw.chat({ ...req, confirmOverBudget: true });
   }

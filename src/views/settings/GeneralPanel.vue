@@ -328,8 +328,8 @@ async function toggleFeature(key: keyof typeof f.value, on: boolean) {
 .azure-box { padding: 10px 2px 2px; }
 .azure-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .az-field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 160px; min-width: 0; }
-.az-field span { font-size: 11.5px; color: var(--text-3); }
-.note { margin: 0 4px; font-size: 11.5px; line-height: 1.75; color: var(--text-3); }
+.az-field span { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
+.note { margin: 0 4px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.75; color: var(--text-3); }
 .switch { position: relative; display: inline-block; width: 44px; height: 26px; flex: 0 0 44px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .switch span {
@@ -345,7 +345,7 @@ async function toggleFeature(key: keyof typeof f.value, on: boolean) {
 .sel {
   height: 30px; padding: 0 8px;
   border: 1px solid var(--line); border-radius: var(--r-full);
-  background: var(--surface-2); color: var(--text-2); font: inherit; font-size: 12.5px;
+  background: var(--surface-2); color: var(--text-2); font: inherit; font-size: calc(12.5px * var(--font-scale));
 }
 .range { width: 120px; accent-color: var(--primary); }
 </style>

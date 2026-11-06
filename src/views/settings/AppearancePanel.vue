@@ -163,10 +163,10 @@ async function pickFont(v: 'harmony' | 'system') {
   height: 30px; padding: 0 8px;
   border: none; border-radius: var(--r-1);
   background: var(--surface-2); color: var(--text-2);
-  font: inherit; font-size: 12px;
+  font: inherit; font-size: calc(12px * var(--font-scale));
   appearance: none; text-align: center;
 }
-.note { margin: 0 4px; font-size: 11.5px; line-height: 1.75; color: var(--text-3); }
+.note { margin: 0 4px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.75; color: var(--text-3); }
 .switch { position: relative; display: inline-block; width: 44px; height: 26px; flex: 0 0 44px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .switch span {
@@ -196,7 +196,7 @@ async function pickFont(v: 'harmony' | 'system') {
 }
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(0.985) } to { opacity: 1; transform: none } }
-.sheet h3 { margin: 0 0 12px; font-size: 16px; }
+.sheet h3 { margin: 0 0 12px; font-size: calc(16px * var(--font-scale)); }
 .opt {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 12px 14px; margin-bottom: 8px;
@@ -208,8 +208,8 @@ async function pickFont(v: 'harmony' | 'system') {
 .opt:hover { border-color: var(--line-strong); }
 .opt.on { border-color: var(--primary); background: var(--primary-soft, rgba(31, 79, 216, 0.08)); }
 .opt-text { display: flex; flex-direction: column; gap: 3px; flex: 1; }
-.opt-text b { font-size: 14px; font-weight: var(--fw-strong); }
-.opt-text span { font-size: 12px; color: var(--text-3); line-height: 1.55; }
+.opt-text b { font-size: calc(14px * var(--font-scale)); font-weight: var(--fw-strong); }
+.opt-text span { font-size: calc(12px * var(--font-scale)); color: var(--text-3); line-height: 1.55; }
 .tick { color: var(--primary); font-weight: var(--fw-strong); }
 @media (max-width: 520px) {
   .scrim { align-items: end; padding: 0; }

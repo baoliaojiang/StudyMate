@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   font: 'harmony',
   fontScale: 1,
   devMode: false,
+  advancedWorkflow: false,
   disclaimerAccepted: false,
   agreements: { privacy: false, terms: false, statement: false },
   simulatedNoticeAccepted: false,

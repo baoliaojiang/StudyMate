@@ -99,7 +99,7 @@ const list = computed(() => {
   animation: rise var(--dur-3) var(--spring-over);
 }
 .head { display: flex; align-items: center; gap: 14px; padding: 18px 20px 12px; }
-.head h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; flex: 0 0 auto; }
+.head h2 { margin: 0; font-size: calc(17px * var(--font-scale)); letter-spacing: -0.01em; flex: 0 0 auto; }
 .search {
   flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px;
   height: 36px; padding: 0 12px; border-radius: var(--r-full);
@@ -107,7 +107,7 @@ const list = computed(() => {
 }
 .search input {
   flex: 1 1 auto; min-width: 0; border: none; background: none;
-  color: var(--text); font-size: 13px; outline: none;
+  color: var(--text); font-size: calc(13px * var(--font-scale)); outline: none;
 }
 .x {
   width: 32px; height: 32px; flex: 0 0 32px; border: none; border-radius: 50%;
@@ -120,7 +120,7 @@ const list = computed(() => {
 .chip {
   flex: 0 0 auto; height: 28px; padding: 0 12px; border: none;
   border-radius: var(--r-full); background: var(--surface-2); color: var(--text-3);
-  font-size: 12px; cursor: pointer;
+  font-size: calc(12px * var(--font-scale)); cursor: pointer;
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 .chip.on { background: var(--text); color: var(--bg); }
@@ -143,24 +143,24 @@ const list = computed(() => {
   width: 32px; height: 32px; flex: 0 0 32px;
   display: grid; place-items: center;
   border-radius: 9px; background: var(--surface-3);
-  color: var(--text-2); font-size: 12px; font-weight: var(--fw-strong);
+  color: var(--text-2); font-size: calc(12px * var(--font-scale)); font-weight: var(--fw-strong);
   letter-spacing: 0.02em;
 }
 .mark.local { background: var(--primary-soft); color: var(--primary); }
-.label { flex: 1 1 auto; font-size: 13px; color: var(--text); line-height: 1.35; }
+.label { flex: 1 1 auto; font-size: calc(13px * var(--font-scale)); color: var(--text); line-height: 1.35; }
 .badge {
-  flex: 0 0 auto; font-size: 9.5px; padding: 2px 5px; border-radius: 4px;
+  flex: 0 0 auto; font-size: calc(9.5px * var(--font-scale)); padding: 2px 5px; border-radius: 4px;
   background: var(--surface-3); color: var(--text-3);
 }
 .badge.warn { background: rgba(138, 90, 0, 0.14); color: #8a5a00; }
-.empty { grid-column: 1 / -1; color: var(--text-3); font-size: 12.5px; padding: 20px 4px; }
+.empty { grid-column: 1 / -1; color: var(--text-3); font-size: calc(12.5px * var(--font-scale)); padding: 20px 4px; }
 
 .foot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 20px; border-top: 1px solid var(--line);
-  font-size: 11.5px; color: var(--text-3);
+  font-size: calc(11.5px * var(--font-scale)); color: var(--text-3);
 }
-.link { border: none; background: none; color: var(--primary); font-size: 12px; cursor: pointer; }
+.link { border: none; background: none; color: var(--primary); font-size: calc(12px * var(--font-scale)); cursor: pointer; }
 
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(0.985) } to { opacity: 1; transform: none } }
@@ -169,7 +169,7 @@ const list = computed(() => {
   .scrim { padding: 0; align-items: flex-end; }
   .panel { max-height: 92vh; border-radius: var(--r-4) var(--r-4) 0 0; }
   .head { flex-wrap: wrap; padding: 16px 16px 10px; gap: 10px; }
-  .head h2 { flex: 1 1 auto; font-size: 16px; }
+  .head h2 { flex: 1 1 auto; font-size: calc(16px * var(--font-scale)); }
   .search { order: 3; flex: 1 0 100%; }
   .chips { padding: 0 16px 10px; }
   .grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 4px 16px 16px; }

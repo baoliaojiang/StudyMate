@@ -341,7 +341,7 @@ async function save() {
 .editor-head b { font-weight: var(--fw-strong); font-size: var(--fs-3); }
 .x {
   width: 30px; height: 30px; flex: 0 0 30px; border: none; border-radius: 50%;
-  background: var(--surface-2); color: var(--text-2); font-size: 18px; cursor: pointer;
+  background: var(--surface-2); color: var(--text-2); font-size: calc(18px * var(--font-scale)); cursor: pointer;
 }
 .editor-body { padding: 16px 18px; overflow-y: auto; }
 .editor-foot {
@@ -350,24 +350,24 @@ async function save() {
   background: var(--surface);
 }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.field-label { font-size: 12px; color: var(--text-3); }
-.field-hint { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
+.field-label { font-size: calc(12px * var(--font-scale)); color: var(--text-3); }
+.field-hint { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .key-row { display: flex; gap: 8px; align-items: center; }
-.chk { display: flex; align-items: flex-start; gap: 9px; font-size: 12.5px; color: var(--text-2); line-height: 1.55; margin-bottom: 10px; cursor: pointer; }
+.chk { display: flex; align-items: flex-start; gap: 9px; font-size: calc(12.5px * var(--font-scale)); color: var(--text-2); line-height: 1.55; margin-bottom: 10px; cursor: pointer; }
 .chk input { width: 17px; height: 17px; flex: 0 0 17px; margin-top: 1px; accent-color: var(--primary); }
 .adv-toggle {
   display: flex; align-items: center; gap: 6px; width: 100%;
   padding: 10px 0; margin-bottom: 4px;
   border: none; border-top: 1px solid var(--line); background: transparent;
-  color: var(--text-2); font-size: 12.5px; cursor: pointer; text-align: left;
+  color: var(--text-2); font-size: calc(12.5px * var(--font-scale)); cursor: pointer; text-align: left;
 }
 .chev { margin-left: auto; transition: transform var(--dur-2) var(--ease-out); }
 .chev.on { transform: rotate(90deg); }
 .fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-3) var(--ease-out); }
 .fold.open { grid-template-rows: 1fr; }
 .fold-inner { overflow: hidden; }
-.err { margin: 4px 0 0; color: var(--danger, #c0392b); font-size: 12px; line-height: 1.6; }
+.err { margin: 4px 0 0; color: var(--danger, #c0392b); font-size: calc(12px * var(--font-scale)); line-height: 1.6; }
 @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
 </style>
 <style scoped>

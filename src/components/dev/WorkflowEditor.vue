@@ -11,6 +11,7 @@ import { PHASE_LABEL, PHASE_ORDER, defaultWorkflow } from '../../workflow/graph'
 import { useWorkflowStore } from '../../workflow/runner';
 import { useAppStore } from '../../stores/app';
 import { fmtTime } from '../../core/id';
+import { askConfirm } from '../../core/task-guard';
 
 const app = useAppStore();
 const wf = useWorkflowStore();
@@ -84,7 +85,13 @@ async function save() {
 }
 
 async function restore() {
-  if (!confirm('丢弃本地改动，恢复内置流程？')) return;
+  const ok = await askConfirm({
+    title: '恢复内置流程',
+    message: '丢弃本地改动，恢复内置流程？',
+    confirmText: '仍然恢复',
+    tone: 'warn',
+  });
+  if (!ok) return;
   const d = await wf.resetDef();
   draft.value = JSON.parse(JSON.stringify(d)) as WorkflowDef;
   dirty.value = false;
@@ -210,10 +217,10 @@ async function restore() {
 .bar { display: flex; gap: var(--sp-3); align-items: flex-start; flex-wrap: wrap; margin-bottom: var(--sp-3); }
 .lead { flex: 1; min-width: 260px; margin: 0; font-size: var(--fs-1); color: var(--text-3); line-height: 1.7; }
 .acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.stat { font-size: 10.5px; color: var(--text-3); padding: 3px 8px; border-radius: var(--r-full); background: var(--surface-2); }
+.stat { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); padding: 3px 8px; border-radius: var(--r-full); background: var(--surface-2); }
 .flow { display: flex; flex-direction: column; gap: var(--sp-4); }
 .lane-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.lane-name { font-size: 11px; font-weight: var(--fw-strong); color: var(--text-3); letter-spacing: 0.04em; white-space: nowrap; }
+.lane-name { font-size: calc(11px * var(--font-scale)); font-weight: var(--fw-strong); color: var(--text-3); letter-spacing: 0.04em; white-space: nowrap; }
 .lane-line { flex: 1; height: 1px; background: var(--line); }
 .nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
 
@@ -227,26 +234,26 @@ async function restore() {
 .node.k-manual { border-left: 3px dashed var(--text-3); }
 .node-head { display: flex; align-items: center; gap: 7px; }
 .kind {
-  font-size: 9.5px; padding: 1px 6px; border-radius: var(--r-full);
+  font-size: calc(9.5px * var(--font-scale)); padding: 1px 6px; border-radius: var(--r-full);
   background: var(--surface-2); color: var(--text-3); white-space: nowrap;
 }
 .node-head b { font-size: var(--fs-2); }
 .grow { flex: 1; }
 .mini {
   width: 22px; height: 22px; border-radius: var(--r-1); border: 1px solid var(--line);
-  background: var(--surface-2); color: var(--text-2); font-size: 11px; cursor: pointer; line-height: 1;
+  background: var(--surface-2); color: var(--text-2); font-size: calc(11px * var(--font-scale)); cursor: pointer; line-height: 1;
 }
 .mini:disabled { opacity: 0.35; cursor: default; }
-.desc { margin: 0; font-size: 11.5px; color: var(--text-2); line-height: 1.6; }
-.req { margin: 0; font-size: 10.5px; color: var(--text-3); line-height: 1.6; }
+.desc { margin: 0; font-size: calc(11.5px * var(--font-scale)); color: var(--text-2); line-height: 1.6; }
+.req { margin: 0; font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
 .node-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
-.sw { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); cursor: pointer; }
-.num { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--text-3); }
+.sw { display: inline-flex; align-items: center; gap: 5px; font-size: calc(11px * var(--font-scale)); color: var(--text-2); cursor: pointer; }
+.num { display: inline-flex; align-items: center; gap: 4px; font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
 .n {
   width: 52px; height: 24px; padding: 0 5px; border-radius: var(--r-1);
   border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
-  font-size: 11px; font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale)); font-family: var(--font-mono);
 }
-.node-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 9.5px; color: var(--text-3); }
+.node-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: calc(9.5px * var(--font-scale)); color: var(--text-3); }
 .tail { margin: var(--sp-3) 0 0; }
 </style>

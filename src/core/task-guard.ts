@@ -36,6 +36,37 @@ export function resolveConfirm(ok: boolean) {
   p.resolve(ok);
 }
 
+/* --------------------------------- 输入 --------------------------------- */
+
+export interface PromptOptions {
+  title: string;
+  message?: string;
+  placeholder?: string;
+  initialValue?: string;
+  confirmText?: string;
+  cancelText?: string;
+}
+
+type PromptPending = PromptOptions & { resolve: (value: string | null) => void };
+
+export const promptState = ref<PromptPending | null>(null);
+
+/** 弹一个应用内输入框，返回用户输入的文本；取消返回 null */
+export function askPrompt(opts: PromptOptions): Promise<string | null> {
+  // 上一个还没答复：先当作取消，避免永远等不到 resolve
+  if (promptState.value) promptState.value.resolve(null);
+  return new Promise<string | null>((resolve) => {
+    promptState.value = { ...opts, resolve };
+  });
+}
+
+export function resolvePrompt(value: string | null) {
+  const p = promptState.value;
+  if (!p) return;
+  promptState.value = null;
+  p.resolve(value);
+}
+
 /* --------------------------------- 任务 --------------------------------- */
 
 interface RunningTask {

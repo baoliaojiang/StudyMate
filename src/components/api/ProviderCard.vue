@@ -111,19 +111,19 @@ const lastTest = computed(() => props.row.lastTest);
   width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   background: var(--surface-3); color: var(--text-2);
-  font-size: 14px; font-weight: var(--fw-strong);
+  font-size: calc(14px * var(--font-scale)); font-weight: var(--fw-strong);
 }
 .line1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .line1 b { font-size: var(--fs-3); font-weight: var(--fw-strong); }
 .tag {
-  font-size: 10.5px; padding: 2px 6px; border-radius: var(--r-full);
+  font-size: calc(10.5px * var(--font-scale)); padding: 2px 6px; border-radius: var(--r-full);
   background: var(--surface-3); color: var(--text-3);
 }
 .tag.beta { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
 .tag.star { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
 .tag.off-tag { background: var(--surface-3); color: var(--text-3); }
-.url { font-size: 11.5px; color: var(--text-3); margin-top: 3px; word-break: break-all; }
-.meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 5px; font-size: 11.5px; color: var(--text-3); }
+.url { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); margin-top: 3px; word-break: break-all; }
+.meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 5px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); opacity: 0.5; }
 .ok-text { color: var(--primary); }
 .bad-text { color: var(--danger, #c0392b); }
@@ -146,7 +146,7 @@ const lastTest = computed(() => props.row.lastTest);
 .stage {
   display: grid; grid-template-columns: 34px 1fr auto; gap: 8px;
   padding: 7px 9px; border-radius: var(--r-2); background: var(--surface);
-  font-size: 11.5px; line-height: 1.55;
+  font-size: calc(11.5px * var(--font-scale)); line-height: 1.55;
 }
 .stage-name { color: var(--text-3); }
 .stage-msg { color: var(--text-2); word-break: break-word; }
@@ -155,8 +155,8 @@ const lastTest = computed(() => props.row.lastTest);
 .stage.fail { background: color-mix(in srgb, var(--danger, #c0392b) 8%, var(--surface)); }
 .stage.fail .stage-name { color: var(--danger, #c0392b); }
 .stage.skipped { opacity: 0.7; }
-.last { margin-top: 10px; font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
+.last { margin-top: 10px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
 .scope { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
-.scope-label { font-size: 11px; color: var(--text-3); margin-bottom: 4px; }
-.scope p { margin: 0; font-size: 11.5px; color: var(--text-2); line-height: 1.7; }
+.scope-label { font-size: calc(11px * var(--font-scale)); color: var(--text-3); margin-bottom: 4px; }
+.scope p { margin: 0; font-size: calc(11.5px * var(--font-scale)); color: var(--text-2); line-height: 1.7; }
 </style>

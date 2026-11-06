@@ -19,6 +19,7 @@ import { useProjectStore } from '../stores/projects';
 import AgentEditor from '../components/dev/AgentEditor.vue';
 import SkillManager from '../components/dev/SkillManager.vue';
 import WorkflowEditor from '../components/dev/WorkflowEditor.vue';
+import { askConfirm } from '../core/task-guard';
 
 const route = useRoute();
 const router = useRouter();
@@ -169,7 +170,13 @@ async function editAgent(id: string) {
 }
 
 async function removeAgent(a: AgentDefinition) {
-  if (!confirm(`删除「${a.name}」？引用它的工作流步骤会被跳过。`)) return;
+  const ok = await askConfirm({
+    title: '删除 Agent',
+    message: `删除「${a.name}」？引用它的工作流步骤会被跳过。`,
+    confirmText: '删除',
+    tone: 'warn',
+  });
+  if (!ok) return;
   try {
     await deleteAgent(a.id);
     app.toast('已删除', 'ok');
@@ -180,7 +187,13 @@ async function removeAgent(a: AgentDefinition) {
 }
 
 async function restoreAgent(a: AgentDefinition) {
-  if (!confirm(`撤销「${a.name}」的本地修改，恢复内置默认？`)) return;
+  const ok = await askConfirm({
+    title: '恢复内置默认',
+    message: `撤销「${a.name}」的本地修改，恢复内置默认？`,
+    confirmText: '仍然恢复',
+    tone: 'warn',
+  });
+  if (!ok) return;
   await resetAgent(a.id);
   app.toast('已恢复默认', 'ok');
   await refreshAgents();
@@ -404,14 +417,14 @@ async function copyPrompt() {
 <style scoped>
 .dev { max-width: 860px; margin: 0 auto; padding: 0 var(--sp-4) 48px; }
 .top { display: flex; align-items: center; gap: 10px; padding: 14px 0 10px; }
-.top h1 { font-size: 17px; margin: 0; }
-.backbtn { background: none; border: none; color: var(--text-2); font-size: 14px; cursor: pointer; padding: 4px 8px; }
+.top h1 { font-size: calc(17px * var(--font-scale)); margin: 0; }
+.backbtn { background: none; border: none; color: var(--text-2); font-size: calc(14px * var(--font-scale)); cursor: pointer; padding: 4px 8px; }
 .backbtn:hover { color: var(--text-1); }
 
 .tabs { display: flex; gap: 6px; margin-bottom: var(--sp-4); overflow-x: auto; }
 .tab {
   border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2);
-  border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
+  border-radius: 999px; padding: 6px 14px; font-size: calc(13px * var(--font-scale)); cursor: pointer; white-space: nowrap;
 }
 .tab.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 
@@ -422,12 +435,12 @@ async function copyPrompt() {
 
 .btn {
   border: 1px solid var(--primary); background: var(--primary); color: #fff;
-  border-radius: var(--r-2); padding: 7px 14px; font-size: 13px; cursor: pointer;
+  border-radius: var(--r-2); padding: 7px 14px; font-size: calc(13px * var(--font-scale)); cursor: pointer;
 }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .mini {
   border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2);
-  border-radius: var(--r-1); padding: 4px 10px; font-size: 12px; cursor: pointer;
+  border-radius: var(--r-1); padding: 4px 10px; font-size: calc(12px * var(--font-scale)); cursor: pointer;
 }
 .mini:hover:not(:disabled) { border-color: var(--text-3); }
 .mini:disabled { opacity: 0.4; cursor: default; }
@@ -443,7 +456,7 @@ async function copyPrompt() {
 .agent-ops { display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 
 .badge {
-  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  font-size: calc(11px * var(--font-scale)); padding: 2px 8px; border-radius: 999px;
   background: var(--primary-soft, var(--surface-3)); color: var(--primary);
 }
 .badge.dim { background: var(--surface-3); color: var(--text-3); }
@@ -474,7 +487,7 @@ async function copyPrompt() {
 }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field label { font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+.field label { font-size: calc(13px * var(--font-scale)); font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
 .field select, .field textarea {
   border: 1px solid var(--line); border-radius: var(--r-2); padding: 8px 10px;
   background: var(--surface-1); color: var(--text-1); font: inherit; width: 100%;
@@ -482,7 +495,7 @@ async function copyPrompt() {
 .field .btn { align-self: flex-start; }
 .prompt {
   background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-2);
-  padding: 10px 12px; font-size: 12px; line-height: 1.6; white-space: pre-wrap;
+  padding: 10px 12px; font-size: calc(12px * var(--font-scale)); line-height: 1.6; white-space: pre-wrap;
   word-break: break-word; margin: 0; max-height: 340px; overflow-y: auto;
 }
 .small-pre { max-height: 160px; }
@@ -492,10 +505,10 @@ async function copyPrompt() {
   border: 1px solid var(--line); border-radius: var(--r-2); padding: 10px;
   display: flex; flex-direction: column; gap: 2px; background: var(--surface-1);
 }
-.stat b { font-size: 16px; font-variant-numeric: tabular-nums; }
-.stat span { font-size: 11px; color: var(--text-3); }
+.stat b { font-size: calc(16px * var(--font-scale)); font-variant-numeric: tabular-nums; }
+.stat span { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 
-.sub-h { font-size: 14px; margin: var(--sp-3) 0 0; }
+.sub-h { font-size: calc(14px * var(--font-scale)); margin: var(--sp-3) 0 0; }
 .run { border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; }
 .run-head {
   width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px;
@@ -512,14 +525,14 @@ async function copyPrompt() {
 .run-steps li.st-running::before { background: var(--primary); }
 .run-steps li.st-awaiting::before { background: var(--warn, #b7791f); }
 
-.log-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.log-table { width: 100%; border-collapse: collapse; font-size: calc(12.5px * var(--font-scale)); }
 .log-table th, .log-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-.log-table th { color: var(--text-3); font-weight: 500; font-size: 11.5px; }
+.log-table th { color: var(--text-3); font-weight: 500; font-size: calc(11.5px * var(--font-scale)); }
 .ok-t { color: var(--ok, #2e7d32); }
 .bad-t { color: var(--danger, #c0392b); }
 
 .muted { color: var(--text-3); }
-.small { font-size: 12.5px; }
+.small { font-size: calc(12.5px * var(--font-scale)); }
 
 @media (max-width: 620px) {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }

@@ -77,10 +77,10 @@ withDefaults(
 .row.danger .row-icon { color: var(--danger, #c0392b); }
 
 .row-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.row-label { font-size: 15px; font-weight: var(--fw-medium); line-height: 1.35; }
-.row-note { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+.row-label { font-size: calc(15px * var(--font-scale)); font-weight: var(--fw-medium); line-height: 1.35; }
+.row-note { font-size: calc(12px * var(--font-scale)); color: var(--text-3); line-height: 1.5; }
 .row-value {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   color: var(--text-3);
   max-width: 56%;
   overflow: hidden;
@@ -92,6 +92,6 @@ withDefaults(
 
 @media (max-width: 700px) {
   .row { min-height: 56px; padding: 12px 16px; }
-  .row-label { font-size: 16px; }
+  .row-label { font-size: calc(16px * var(--font-scale)); }
 }
 </style>

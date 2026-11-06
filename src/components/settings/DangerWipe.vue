@@ -206,27 +206,27 @@ onBeforeUnmount(() => {
 .steps i { height: 3px; flex: 1; border-radius: var(--r-full); background: var(--surface-3); transition: background var(--dur-3); }
 .steps i.on { background: var(--danger, #c0392b); }
 
-h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: -0.01em; }
-.lead { margin: 0 0 14px; font-size: 13px; line-height: 1.75; color: var(--text-2); }
+h2 { margin: 0 0 8px; font-size: calc(18px * var(--font-scale)); letter-spacing: -0.01em; }
+.lead { margin: 0 0 14px; font-size: calc(13px * var(--font-scale)); line-height: 1.75; color: var(--text-2); }
 .facts {
   margin: 0 0 12px; padding: 12px 14px; list-style: none;
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2);
-  font-size: 12.5px; color: var(--text-2);
+  font-size: calc(12.5px * var(--font-scale)); color: var(--text-2);
 }
-.facts b { font-size: 15px; color: var(--text); font-variant-numeric: tabular-nums; margin-right: 4px; }
-.hint { margin: 8px 0 0; font-size: 12px; color: var(--text-3); line-height: 1.7; }
-.err { margin: 10px 0 0; font-size: 12.5px; color: var(--danger, #c0392b); }
+.facts b { font-size: calc(15px * var(--font-scale)); color: var(--text); font-variant-numeric: tabular-nums; margin-right: 4px; }
+.hint { margin: 8px 0 0; font-size: calc(12px * var(--font-scale)); color: var(--text-3); line-height: 1.7; }
+.err { margin: 10px 0 0; font-size: calc(12.5px * var(--font-scale)); color: var(--danger, #c0392b); }
 .field { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
-.field-label { font-size: 12px; color: var(--text-3); }
+.field-label { font-size: calc(12px * var(--font-scale)); color: var(--text-3); }
 .input {
   height: 42px; padding: 0 12px;
   border: 1px solid var(--line-strong); border-radius: var(--r-1);
-  background: var(--surface); color: var(--text); font: inherit; font-size: 14px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: calc(14px * var(--font-scale));
 }
 .input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
 .mono { font-family: var(--font-mono); letter-spacing: 0.12em; }
-.check { display: flex; gap: 9px; margin-top: 14px; font-size: 12.5px; line-height: 1.65; color: var(--text-2); cursor: pointer; }
+.check { display: flex; gap: 9px; margin-top: 14px; font-size: calc(12.5px * var(--font-scale)); line-height: 1.65; color: var(--text-2); cursor: pointer; }
 .check input { margin-top: 2px; accent-color: var(--danger, #c0392b); }
 .code-box {
   display: flex; gap: 8px; justify-content: center;
@@ -241,7 +241,7 @@ h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: -0.01em; }
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   font-family: var(--font-mono);
-  font-size: 22px; font-weight: var(--fw-strong);
+  font-size: calc(22px * var(--font-scale)); font-weight: var(--fw-strong);
   color: var(--text);
   transform: rotate(-1.5deg);
 }

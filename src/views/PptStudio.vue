@@ -448,7 +448,7 @@ function setLayout(slideIndex: number, value: SlideLayout) {
   padding: var(--sp-4) var(--sp-5) var(--sp-3);
 }
 .deck-head h1 { font-size: var(--fs-4); }
-.deck-sub { margin: 4px 0 0; font-size: 11.5px; color: var(--text-3); }
+.deck-sub { margin: 4px 0 0; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); }
 .back {
   width: 36px; height: 36px; flex: 0 0 36px;
   border-radius: 50%; border: none;
@@ -483,19 +483,19 @@ function setLayout(slideIndex: number, value: SlideLayout) {
 .step-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .steps li.running b, .steps li.done b { color: var(--text); }
 .step-body b { font-size: var(--fs-2); font-weight: var(--fw-medium); }
-.step-note { font-size: 11.5px; color: var(--text-3); line-height: 1.55; }
-.step-body small { font-size: 10.5px; opacity: 0.75; }
+.step-note { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.55; }
+.step-body small { font-size: calc(10.5px * var(--font-scale)); opacity: 0.75; }
 .warn-box {
   margin-top: 12px; padding: 10px 12px; border-radius: var(--r-2);
   background: var(--surface-2); color: var(--text-2);
-  font-size: 11.5px; line-height: 1.7; display: flex; flex-direction: column; gap: 6px;
+  font-size: calc(11.5px * var(--font-scale)); line-height: 1.7; display: flex; flex-direction: column; gap: 6px;
 }
 
 .issue {
   display: flex; gap: 8px; align-items: baseline;
   padding: 7px 10px; margin-bottom: 6px;
   border-radius: var(--r-1); background: var(--surface-2);
-  font-size: 11.5px; color: var(--text-2);
+  font-size: calc(11.5px * var(--font-scale)); color: var(--text-2);
 }
 .issue b { flex: 0 0 auto; color: var(--text-3); font-weight: var(--fw-medium); }
 .issue.high { background: rgba(169, 80, 47, 0.1); color: var(--danger); }
@@ -511,7 +511,7 @@ function setLayout(slideIndex: number, value: SlideLayout) {
   width: 56px; height: 56px; margin: 0 auto 14px;
   display: grid; place-items: center; border-radius: var(--r-2);
   background: var(--primary-soft); color: var(--primary);
-  font-size: 15px; font-weight: var(--fw-strong); letter-spacing: 0.04em;
+  font-size: calc(15px * var(--font-scale)); font-weight: var(--fw-strong); letter-spacing: 0.04em;
 }
 
 .deck-meta { display: flex; align-items: flex-end; gap: var(--sp-4); margin-bottom: 12px; }
@@ -526,14 +526,14 @@ function setLayout(slideIndex: number, value: SlideLayout) {
 .slide-num {
   flex: 0 0 34px; width: 34px; height: 34px; border-radius: var(--r-1);
   display: grid; place-items: center; background: var(--surface-3);
-  font-size: 12px; color: var(--text-2);
+  font-size: calc(12px * var(--font-scale)); color: var(--text-2);
 }
 .slide-info { min-width: 0; }
 .slide-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .slide-title b { font-size: var(--fs-2); font-weight: var(--fw-strong); transition: color var(--dur-2) var(--ease-out); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.layout-tag { flex: 0 0 auto; font-size: 10.5px; color: var(--primary); background: var(--primary-soft); padding: 2px 8px; border-radius: var(--r-full); }
-.slide-lead { margin-top: 3px; font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chev { font-size: 20px; color: var(--text-3); transition: transform var(--dur-2) var(--ease-out); }
+.layout-tag { flex: 0 0 auto; font-size: calc(10.5px * var(--font-scale)); color: var(--primary); background: var(--primary-soft); padding: 2px 8px; border-radius: var(--r-full); }
+.slide-lead { margin-top: 3px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev { font-size: calc(20px * var(--font-scale)); color: var(--text-3); transition: transform var(--dur-2) var(--ease-out); }
 .chev.on { transform: rotate(90deg); }
 
 .slide-editor-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 320ms var(--ease-out); }
@@ -542,12 +542,12 @@ function setLayout(slideIndex: number, value: SlideLayout) {
 .slide-card.open .slide-editor-inner { padding: 4px 14px 16px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-3); }
 .form-wide { grid-column: 1 / -1; }
-.field-label { font-size: 11px; color: var(--text-3); }
+.field-label { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 .bullet-row { display: flex; gap: 6px; margin-bottom: 6px; }
 .bullet-row .input { flex: 1; }
 .mini-x {
   width: 32px; flex: 0 0 32px; border: none; border-radius: var(--r-1);
-  background: var(--surface-2); color: var(--text-3); cursor: pointer; font-size: 17px;
+  background: var(--surface-2); color: var(--text-3); cursor: pointer; font-size: calc(17px * var(--font-scale));
 }
 .mini-x:hover { color: var(--danger); }
 .check-row { display: flex; align-items: center; gap: 8px; font-size: var(--fs-1); color: var(--text-2); margin: 4px 0 12px; }

@@ -238,6 +238,31 @@ async function setTyping(k: 'fast' | 'normal' | 'slow') {
 async function toggleThinking(on: boolean) {
   await app.saveSettings({ thinking: on });
 }
+/**
+ * 全自动工作流：默认关闭。打开前必须过一段风险确认——
+ * 它不是主路径，随时可能下线，所以要把「自己核对、别依赖」说在前面。
+ */
+async function toggleAdvancedWorkflow(on: boolean) {
+  if (!on) {
+    await app.saveSettings({ advancedWorkflow: false });
+    return;
+  }
+  const ok = await askConfirm({
+    title: '开启全自动工作流？',
+    message:
+      '这个功能不推荐使用，后续版本可能直接移除。\n\n' +
+      '它会顺着 22 步一口气往下跑，中间只停下来问你要不要确认；面板里看到的常常只是摘要，' +
+      '正文仍然要回项目页逐份核对。\n\n' +
+      '日常更省事的路子是用「研究记录」：每篇单独生成、单独确认、单独导出，写错了只改那一篇。\n\n' +
+      '开启后请自行核对每一步的结果，不要指望它一次性交出整套材料。',
+    confirmText: '我了解，仍要开启',
+    cancelText: '保持关闭',
+    tone: 'warn',
+  });
+  if (!ok) return;
+  await app.saveSettings({ advancedWorkflow: true });
+}
+
 async function toggleMemory(on: boolean) {
   await app.setFeatures({ memory: on });
 }
@@ -326,7 +351,7 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
             <SettingRow label="隐私政策" chevron @click="router.push('/legal/privacy')">
               <template #icon><AppIcon name="privacy" /></template>
             </SettingRow>
-            <SettingRow label="开源许可" value="MIT" chevron @click="router.push('/legal/license')">
+            <SettingRow label="使用许可" value="学习免费" chevron @click="router.push('/legal/license')">
               <template #icon><AppIcon name="license" /></template>
             </SettingRow>
           </SettingGroup>
@@ -362,6 +387,28 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
                 <span>{{ ag.description }}</span>
               </span>
             </label>
+          </SettingGroup>
+
+          <SettingGroup title="高级功能">
+            <SettingRow
+              label="全自动工作流"
+              :value="s.advancedWorkflow ? '已开启' : '未开启'"
+              note="不推荐 · 即将下线。会把整套流程一口气跑完，中间只看摘要；日常请用「研究记录」逐篇生成"
+            >
+              <template #right>
+                <label class="switch" @click.stop>
+                  <input
+                    type="checkbox"
+                    :checked="s.advancedWorkflow === true"
+                    @change="toggleAdvancedWorkflow(($event.target as HTMLInputElement).checked)"
+                  />
+                  <span />
+                </label>
+              </template>
+            </SettingRow>
+            <p class="note">
+              关掉不会删除已有数据；已经跑出来的报告与记录照旧在项目里。开启前会让你先确认一次风险。
+            </p>
           </SettingGroup>
 
           <SettingGroup title="开发者选项">
@@ -665,12 +712,12 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
 }
 .pick input { width: 17px; height: 17px; flex: 0 0 17px; margin-top: 2px; accent-color: var(--primary); }
 .pick-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.pick-text b { font-size: 13px; font-weight: var(--fw-medium); }
-.pick-text span { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
+.pick-text b { font-size: calc(13px * var(--font-scale)); font-weight: var(--fw-medium); }
+.pick-text span { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
 .settings-page { max-width: 720px; margin: 0 auto; padding: 4px 20px 72px; }
 .hub-head { padding: 4px 2px 16px; }
-.hub-head h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
-.hub-head p { margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
+.hub-head h1 { margin: 0; font-size: calc(26px * var(--font-scale)); letter-spacing: -0.02em; }
+.hub-head p { margin: 6px 0 0; font-size: calc(12px * var(--font-scale)); color: var(--text-3); }
 
 .me-card {
   display: flex; align-items: center; gap: 12px; width: 100%;
@@ -682,10 +729,10 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
 .me-card:hover { background: var(--surface-2); }
 .me-card:active { transform: scale(0.995); }
 .me-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.me-text b { font-size: 16px; font-weight: var(--fw-strong); }
-.me-text span { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-text b { font-size: calc(16px * var(--font-scale)); font-weight: var(--fw-strong); }
+.me-text span { font-size: calc(12px * var(--font-scale)); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge {
-  font-size: 10.5px; padding: 3px 8px; border-radius: var(--r-full);
+  font-size: calc(10.5px * var(--font-scale)); padding: 3px 8px; border-radius: var(--r-full);
   background: var(--primary-soft, rgba(31, 79, 216, 0.1)); color: var(--primary);
   white-space: nowrap;
 }
@@ -698,14 +745,14 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
 }
 .inline + .inline { border-top: 1px solid var(--line); }
 .inline-label { font-size: var(--fs-2); color: var(--text); display: flex; flex-direction: column; gap: 2px; }
-.inline-hint { font-size: 10.5px; color: var(--text-3); }
+.inline-hint { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
 .seg {
   display: inline-flex; gap: 2px; padding: 2px; flex: 0 0 auto;
   background: var(--surface-2); border-radius: var(--r-2);
 }
 .seg-item {
   border: none; background: transparent; color: var(--text-3);
-  font-size: 11.5px; padding: 5px 10px; border-radius: calc(var(--r-2) - 2px);
+  font-size: calc(11.5px * var(--font-scale)); padding: 5px 10px; border-radius: calc(var(--r-2) - 2px);
   cursor: pointer; white-space: nowrap;
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
@@ -713,13 +760,13 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
 .num {
   width: 84px; flex: 0 0 84px; text-align: right;
   border: none; border-radius: var(--r-2); background: var(--surface-2);
-  color: var(--text); font-size: 12.5px; padding: 6px 8px;
+  color: var(--text); font-size: calc(12.5px * var(--font-scale)); padding: 6px 8px;
   font-variant-numeric: tabular-nums;
 }
 
 .other { padding-top: 4px; }
 .sub-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.sub-head h1 { margin: 0; font-size: 17px; font-weight: var(--fw-strong); }
+.sub-head h1 { margin: 0; font-size: calc(17px * var(--font-scale)); font-weight: var(--fw-strong); }
 .back {
   width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center;
   border: none; border-radius: 50%; background: var(--surface-2);
@@ -729,11 +776,11 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
 
 .ver-line {
   margin: 22px 0 0; text-align: center;
-  font-size: 10.5px; line-height: 1.8; color: var(--text-3);
+  font-size: calc(10.5px * var(--font-scale)); line-height: 1.8; color: var(--text-3);
 }
 .panel-wrap { padding: 0; }
 .dev-wrap { padding-top: 8px; }
-.note { font-size: 11.5px; color: var(--text-3); line-height: 1.7; margin: 10px 2px 0; }
+.note { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.7; margin: 10px 2px 0; }
 
 /* 二级页进退场：轻微横向位移 + 淡入，方向感比纯淡入清楚 */
 .sub-enter-active { transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out); }
@@ -746,8 +793,8 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
 @media (max-width: 860px) {
   .settings-page { padding: 0 16px 56px; }
   .hub-head { padding: 2px 2px 14px; }
-  .hub-head h1 { font-size: 24px; }
+  .hub-head h1 { font-size: calc(24px * var(--font-scale)); }
   .inline { min-height: 50px; padding: 9px 12px; }
-  .seg-item { padding: 5px 9px; font-size: 11px; }
+  .seg-item { padding: 5px 9px; font-size: calc(11px * var(--font-scale)); }
 }
 </style>

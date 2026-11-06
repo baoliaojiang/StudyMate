@@ -555,7 +555,7 @@ async function create() {
 
       <div v-if="extracted.length || extractWarnings.length" class="card card-pad result">
         <div class="row-between" style="margin-bottom: 10px">
-          <b style="font-size: 14px">识别结果</b>
+          <b style="font-size: calc(14px * var(--font-scale))">识别结果</b>
           <span class="chip" :class="aiUsed ? 'chip-accent' : ''">
             {{ aiUsed ? '规则 + AI 精修' : '离线规则解析' }}
           </span>
@@ -566,13 +566,13 @@ async function create() {
           <div class="grow">
             <div class="ex-key">
               {{ f.label }}
-              <span class="chip" v-if="f.from === 'ai'" style="height: 20px; font-size: 10.5px">AI 推断</span>
+              <span class="chip" v-if="f.from === 'ai'" style="height: 20px; font-size: calc(10.5px * var(--font-scale))">AI 推断</span>
             </div>
             <div class="ex-val">{{ f.value }}</div>
             <div v-if="f.evidence" class="ex-ev">{{ f.evidence }}</div>
           </div>
         </label>
-        <div v-for="w in extractWarnings" :key="w" class="banner banner-warn" style="margin-top: 8px; font-size: 12px">
+        <div v-for="w in extractWarnings" :key="w" class="banner banner-warn" style="margin-top: 8px; font-size: calc(12px * var(--font-scale))">
           {{ w }}
         </div>
         <button v-if="extracted.length" class="btn btn-primary btn-sm" style="margin-top: 12px" @click="applyExtracted">
@@ -603,7 +603,7 @@ async function create() {
         <div v-if="form.members.length" class="members">
           <div v-for="m in form.members" :key="m.id" class="member">
             <span class="m-name">{{ m.name }}</span>
-            <span v-if="m.role === 'leader'" class="chip chip-accent" style="height: 20px; font-size: 10.5px">组长</span>
+            <span v-if="m.role === 'leader'" class="chip chip-accent" style="height: 20px; font-size: calc(10.5px * var(--font-scale))">组长</span>
             <button v-else class="mini" @click="setLeader(m.id)">设为组长</button>
             <button class="mini danger" @click="removeMember(m.id)">移除</button>
           </div>
@@ -637,7 +637,7 @@ async function create() {
         </label>
       </div>
 
-      <div class="banner" style="font-size: 12px">
+      <div class="banner" style="font-size: calc(12px * var(--font-scale))">
         上表按福州鼓山中学常用表格字段设置。不确定的项先留空，别猜——建好后还能改。
       </div>
     </section>
@@ -694,7 +694,7 @@ async function create() {
           AI 主导辅助
         </button>
       </div>
-      <div class="banner" style="margin-top: 10px; font-size: 12px">
+      <div class="banner" style="margin-top: 10px; font-size: calc(12px * var(--font-scale))">
         {{
           form.aiMode === 'assist'
             ? '你是主要研究者，AI 只给建议、整理、分析和修改。'
@@ -714,7 +714,7 @@ async function create() {
         </label>
         <div class="inline-field">
           <span>下学期</span>
-          <b style="font-size: 15px">{{ secondTerm }}</b>
+          <b style="font-size: calc(15px * var(--font-scale))">{{ secondTerm }}</b>
         </div>
       </div>
       <span class="field-hint">默认 15 篇（8 + 7）。按学校的实际要求调整。</span>
@@ -723,7 +723,7 @@ async function create() {
     <!-- 步骤 4 -->
     <section v-else class="pane">
       <div class="card card-pad confirm">
-        <h2 style="font-size: 17px; margin-bottom: 14px">{{ form.topic || '（未填主题）' }}</h2>
+        <h2 style="font-size: calc(17px * var(--font-scale)); margin-bottom: 14px">{{ form.topic || '（未填主题）' }}</h2>
         <div class="kv"><span>指导教师</span><b>{{ form.teacher }}</b></div>
         <div class="kv"><span>成员</span><b>{{ form.members.map((m) => m.name).join('、') }}</b></div>
         <div class="kv"><span>学校 / 年级 / 班级</span><b>{{ form.school }} {{ form.grade }} {{ form.className }}</b></div>
@@ -742,7 +742,7 @@ async function create() {
           <b>开题 1 + 研究记录 {{ form.recordTotal }}（{{ form.firstTerm }}+{{ secondTerm }}）+ 中期 1 + 结题 1</b>
         </div>
       </div>
-      <div class="banner banner-warn" style="margin-top: 14px; font-size: 12px">
+      <div class="banner banner-warn" style="margin-top: 14px; font-size: calc(12px * var(--font-scale))">
         创建后会先生成空白框架。AI 不会替你写任何「已完成」的研究工作——那需要你的真实记录。
       </div>
     </section>
@@ -833,7 +833,7 @@ async function create() {
           <div class="picker-list">
             <button v-for="t in filteredTopics" :key="t.topic" class="topic-item" type="button" @click="pickTopic(t.topic)">
               <span class="grow">
-                <b style="font-size: 13.5px">{{ t.topic }}</b>
+                <b style="font-size: calc(13.5px * var(--font-scale))">{{ t.topic }}</b>
                 <span class="muted small" style="display: block; margin-top: 2px">{{ t.subject }}</span>
               </span>
               <span class="muted small">选这个</span>
@@ -931,10 +931,10 @@ async function create() {
 <style scoped>
 .page { max-width: 720px; margin: 0 auto; padding: 20px 20px 60px; }
 .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.head h1 { font-size: 21px; }
+.head h1 { font-size: calc(21px * var(--font-scale)); }
 .back {
   width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line);
-  background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px;
+  background: var(--surface); color: var(--text); cursor: pointer; font-size: calc(16px * var(--font-scale));
 }
 .progress { height: 3px; background: var(--surface-3); border-radius: 2px; margin-bottom: 24px; overflow: hidden; }
 .bar { height: 100%; background: var(--grad); transition: width 320ms var(--ease); }
@@ -946,9 +946,9 @@ async function create() {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2);
 }
-.m-name { font-size: 13.5px; font-weight: var(--fw-strong); }
+.m-name { font-size: calc(13.5px * var(--font-scale)); font-weight: var(--fw-strong); }
 .mini {
-  margin-left: auto; font-size: 11.5px; color: var(--text-3); background: none;
+  margin-left: auto; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); background: none;
   border: none; cursor: pointer; padding: 2px 4px;
 }
 .mini.danger { margin-left: 0; color: var(--danger); }
@@ -957,9 +957,9 @@ async function create() {
 .ex-row { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .ex-row:last-of-type { border-bottom: none; }
 .cb { width: 17px; height: 17px; margin-top: 3px; accent-color: var(--primary); flex: 0 0 17px; }
-.ex-key { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
-.ex-val { font-size: 13.5px; margin-top: 2px; }
-.ex-ev { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: var(--font-mono); }
+.ex-key { font-size: calc(12px * var(--font-scale)); color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+.ex-val { font-size: calc(13.5px * var(--font-scale)); margin-top: 2px; }
+.ex-ev { font-size: calc(11px * var(--font-scale)); color: var(--text-3); margin-top: 4px; font-family: var(--font-mono); }
 
 .mode-list { display: flex; flex-direction: column; gap: 8px; }
 .mode {
@@ -967,19 +967,19 @@ async function create() {
   background: var(--surface); border: 1px solid var(--line); cursor: pointer;
 }
 .mode.on { border-color: var(--primary); background: var(--primary-soft); }
-.mode b { display: block; font-size: 13.5px; }
-.mode span { font-size: 12px; color: var(--text-3); }
+.mode b { display: block; font-size: calc(13.5px * var(--font-scale)); }
+.mode span { font-size: calc(12px * var(--font-scale)); color: var(--text-3); }
 
 .seg { display: flex; gap: 6px; padding: 5px; background: var(--surface-2); border-radius: var(--r-full); }
 .seg-item {
   flex: 1; height: 38px; border: none; background: transparent; border-radius: var(--r-full);
-  color: var(--text-2); font-size: 13.5px; font-weight: var(--fw-strong); cursor: pointer;
+  color: var(--text-2); font-size: calc(13.5px * var(--font-scale)); font-weight: var(--fw-strong); cursor: pointer;
 }
 .seg-item.on { background: var(--grad); color: #fff; }
 
-.inline-field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
+.inline-field { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--font-scale)); color: var(--text-2); }
 
-.confirm .kv { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.confirm .kv { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: calc(13.5px * var(--font-scale)); }
 .confirm .kv:last-child { border-bottom: none; }
 .confirm .kv span { color: var(--text-3); width: 120px; flex: 0 0 120px; }
 .confirm .kv b { font-weight: var(--fw-strong); }
@@ -987,7 +987,7 @@ async function create() {
 .foot { display: flex; gap: 10px; align-items: center; margin-top: 28px; flex-wrap: wrap; }
 /* 按钮永远不被文字挤扁 */
 .foot .btn { flex: 0 0 auto; white-space: nowrap; }
-.block-reason { font-size: 11.5px; color: var(--text-3); margin-right: 4px; }
+.block-reason { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); margin-right: 4px; }
 
 @media (max-width: 720px) {
   /* 窄屏：提示独占一行，按钮平分，不再挤成半个 */
@@ -997,7 +997,7 @@ async function create() {
 }
 .ai-note {
   margin: 0 0 18px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale));
   line-height: 1.7;
   color: var(--text-3);
   max-width: 52em;
@@ -1018,7 +1018,7 @@ async function create() {
   background: var(--bg); border-radius: var(--r-4);
   padding: 20px 20px 16px; box-shadow: var(--shadow-3);
 }
-.pure-card h3 { margin: 0 0 6px; font-size: 16px; }
+.pure-card h3 { margin: 0 0 6px; font-size: calc(16px * var(--font-scale)); }
 .pure-item {
   display: flex; gap: 10px; align-items: flex-start;
   margin-top: 12px; padding: 10px 12px;
@@ -1027,8 +1027,8 @@ async function create() {
 }
 .pure-item input { width: 17px; height: 17px; flex: 0 0 17px; margin-top: 2px; accent-color: var(--primary); }
 .pure-item span { display: flex; flex-direction: column; gap: 3px; }
-.pure-item b { font-size: 13px; }
-.pure-item i { font-style: normal; font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
+.pure-item b { font-size: calc(13px * var(--font-scale)); }
+.pure-item i { font-style: normal; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
 
 /* 备选选题弹层 */
 .topic-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -1070,7 +1070,7 @@ async function create() {
   flex: 0 0 auto; height: 30px; padding: 0 12px;
   border: none; border-radius: var(--r-full);
   background: var(--surface-2); color: var(--text-3);
-  font-size: 12.5px; cursor: pointer;
+  font-size: calc(12.5px * var(--font-scale)); cursor: pointer;
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 .chip.on { background: var(--text); color: var(--bg); }
@@ -1087,9 +1087,9 @@ async function create() {
   transition: background var(--dur-1) var(--ease-out);
 }
 .topic-item:hover { background: var(--surface-2); }
-.topic-no { font-size: 11.5px; color: var(--text-3); width: 26px; flex: 0 0 26px; }
+.topic-no { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); width: 26px; flex: 0 0 26px; }
 .topic-name { font-size: var(--fs-2); color: var(--text); }
-.topic-sub { font-size: 11.5px; color: var(--text-3); flex: 0 0 auto; }
+.topic-sub { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); flex: 0 0 auto; }
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.98) } to { opacity: 1; transform: none } }
 
@@ -1099,11 +1099,11 @@ async function create() {
   margin-top: 10px; padding: 7px 12px 7px 10px;
   border: none; border-radius: var(--r-full);
   background: var(--primary-soft); color: var(--primary);
-  font-size: 12.5px; font-weight: var(--fw-strong); cursor: pointer;
+  font-size: calc(12.5px * var(--font-scale)); font-weight: var(--fw-strong); cursor: pointer;
   transition: background var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
 }
 .idea-entry:hover { background: var(--primary-soft-2, var(--surface-2)); transform: translateY(-1px); }
-.idea-spark { font-size: 12px; opacity: 0.9; }
+.idea-spark { font-size: calc(12px * var(--font-scale)); opacity: 0.9; }
 .idea-arrow { opacity: 0.55; transition: transform var(--dur-2) var(--ease-out); }
 .idea-entry:hover .idea-arrow { transform: translateX(3px); }
 
@@ -1130,9 +1130,9 @@ async function create() {
   width: 18px; height: 18px; flex: 0 0 18px; margin-top: 2px;
   display: grid; place-items: center; border-radius: 50%;
   background: var(--bg); color: var(--text-3);
-  font-size: 10.5px; font-variant-numeric: tabular-nums;
+  font-size: calc(10.5px * var(--font-scale)); font-variant-numeric: tabular-nums;
 }
-.idea-why { display: block; margin-top: 4px; font-size: 11.5px; color: var(--text-3); line-height: 1.7; }
+.idea-why { display: block; margin-top: 4px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.7; }
 .idea-wait { padding: 14px 2px; }
 
 @media (max-width: 560px) {

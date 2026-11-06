@@ -12,6 +12,7 @@ import type { AgentDefinition, SkillDefinition } from '../../core/types';
 import { saveAgent, resetAgent, deleteAgent, isOverridden } from '../../agents/registry';
 import { CAPABILITY_LABEL } from '../../skills/registry';
 import { useAppStore } from '../../stores/app';
+import { askConfirm } from '../../core/task-guard';
 
 const props = defineProps<{
   agent: AgentDefinition;
@@ -87,14 +88,26 @@ async function save() {
 }
 
 async function restore() {
-  if (!confirm('撤销本地修改，恢复内置默认？')) return;
+  const ok = await askConfirm({
+    title: '恢复内置默认',
+    message: '撤销本地修改，恢复内置默认？',
+    confirmText: '仍然恢复',
+    tone: 'warn',
+  });
+  if (!ok) return;
   await resetAgent(draft.value.id);
   app.toast('已恢复默认', 'ok');
   emit('saved');
 }
 
 async function remove() {
-  if (!confirm(`删除「${draft.value.name}」？引用它的工作流步骤会跳过。`)) return;
+  const ok = await askConfirm({
+    title: '删除 Agent',
+    message: `删除「${draft.value.name}」？引用它的工作流步骤会跳过。`,
+    confirmText: '删除',
+    tone: 'warn',
+  });
+  if (!ok) return;
   try {
     await deleteAgent(draft.value.id);
     app.toast('已删除', 'ok');
@@ -274,15 +287,15 @@ async function remove() {
 }
 @keyframes slide { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 .head { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); }
-.eyebrow { font-size: 10.5px; color: var(--text-3); letter-spacing: 0.06em; }
+.eyebrow { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); letter-spacing: 0.06em; }
 .head h3 { font-size: var(--fs-3); margin: 2px 0; }
-.id { font-size: 10.5px; color: var(--text-3); }
-.x { width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--surface-2); color: var(--text-2); font-size: 18px; cursor: pointer; }
+.id { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
+.x { width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--surface-2); color: var(--text-2); font-size: calc(18px * var(--font-scale)); cursor: pointer; }
 .body { flex: 1; overflow-y: auto; padding: var(--sp-4) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-4); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field > span { font-size: 11.5px; color: var(--text-3); font-weight: var(--fw-strong); }
+.field > span { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); font-weight: var(--fw-strong); }
 .field.row { flex-direction: row; align-items: center; gap: 8px; }
 .inline { font-size: var(--fs-2); color: var(--text-2); }
 .input {
@@ -292,18 +305,18 @@ async function remove() {
 }
 .input:focus { outline: none; border-color: var(--primary); }
 .area { height: auto; padding: 10px; line-height: 1.7; resize: vertical; }
-.hint { font-size: 10.5px; color: var(--text-3); line-height: 1.6; }
+.hint { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); line-height: 1.6; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-btn {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
   border-radius: var(--r-full); border: 1px solid var(--line); background: var(--surface);
-  color: var(--text-2); font-size: 11.5px; cursor: pointer;
+  color: var(--text-2); font-size: calc(11.5px * var(--font-scale)); cursor: pointer;
 }
-.chip-btn em { font-style: normal; font-size: 9.5px; color: var(--text-3); }
+.chip-btn em { font-style: normal; font-size: calc(9.5px * var(--font-scale)); color: var(--text-3); }
 .chip-btn.on { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
 .perms { display: flex; flex-direction: column; gap: 8px; }
 .perm { display: grid; grid-template-columns: 16px auto; gap: 2px 8px; align-items: center; font-size: var(--fs-2); }
-.perm em { grid-column: 2; font-style: normal; font-size: 10.5px; color: var(--text-3); }
-.origin { font-size: 10.5px; color: var(--text-3); margin: 0; }
+.perm em { grid-column: 2; font-style: normal; font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); }
+.origin { font-size: calc(10.5px * var(--font-scale)); color: var(--text-3); margin: 0; }
 .foot { display: flex; gap: var(--sp-2); align-items: center; padding: var(--sp-3) var(--sp-5); border-top: 1px solid var(--line); }
 </style>
