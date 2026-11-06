@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- 研学帮 StudyMate 图标
+       白底超椭圆 + 三张叠放的记录纸（15 篇逐篇累积）+ 右上折角处的蓝点 -->
+  <rect x="0" y="0" width="1024" height="1024" rx="248" fill="#ffffff"/>
+
+  <!-- 最底层 -->
+  <rect x="189" y="315" width="470" height="570" rx="82" fill="#d5d5da" stroke="#ffffff" stroke-width="18"/>
+  <!-- 中间层 -->
+  <rect x="277" y="227" width="470" height="570" rx="82" fill="#9a9aa4" stroke="#ffffff" stroke-width="18"/>
+  <!-- 顶层：带折角的纸 -->
+  <path d="M447 139 H685 L835 289 V627 A82 82 0 0 1 753 709 H447 A82 82 0 0 1 365 627 V221 A82 82 0 0 1 447 139 Z"
+        fill="#111114"/>
+  <!-- 折角：从缺口透出底色 -->
+  <path d="M685 139 L835 289 L685 289 Z" fill="#ffffff"/>
+  <!-- 蓝点压在折角上 -->
+  <circle cx="762" cy="212" r="66" fill="#2b6cff"/>
+</svg>
