@@ -11,7 +11,6 @@
 
 import { db } from './db';
 import { maskKey, open_, openWithPassphrase, seal, sealWithPassphrase } from './crypto';
-import { downloadBlob } from '../export/download';
 import type {
   ActivityRecord,
   AppSettings,
@@ -278,10 +277,3 @@ export async function importAllData(text: string, passphrase: string): Promise<I
   };
 }
 
-/** 触发浏览器下载（a 必须挂进 DOM，否则部分浏览器会静默丢弃） */
-export function downloadBackup(text: string, name?: string) {
-  downloadBlob(
-    new Blob([text], { type: 'application/json;charset=utf-8' }),
-    name ?? `studymate-backup-${new Date().toISOString().slice(0, 10)}.json`,
-  );
-}

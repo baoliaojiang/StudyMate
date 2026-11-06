@@ -16,7 +16,6 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'discover', label: '发现', to: '/discover', icon: 'compass' },
   { key: 'new', label: '新建项目', to: '/new', icon: 'plus' },
   { key: 'home', label: '对话', to: '/', icon: 'chat' },
-  { key: 'records', label: '过程记录', to: '/records', icon: 'clock' },
   { key: 'library', label: '资料库', to: '/library', icon: 'box' },
   { key: 'settings', label: '设置', to: '/settings', icon: 'gear' },
 ];

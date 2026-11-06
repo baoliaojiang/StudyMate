@@ -10,7 +10,17 @@ import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { useProjectStore } from '../stores/projects';
 import type { StudyRecord } from '../core/types';
-import { NO_FABRICATION_RULE, recordLine } from '../reports/context';
+import {
+  buildRecordFlow,
+  recordPrompt,
+  repairRecordDraft,
+  recorderOf,
+  type RecordDraftFields,
+} from '../core/record-content';
+import { useAiProgress } from '../core/ai-progress';
+import AiProgress from './AiProgress.vue';
+import { buildRecordsDocx } from '../docx/builder';
+import DocxPreview from './DocxPreview.vue';
 import { getAgent } from '../agents/definitions';
 import { AgentRuntime } from '../agents/runtime';
 import { exportRecordDocx, shareRecordDocx } from '../export/record';
@@ -23,6 +33,13 @@ const router = useRouter();
 const busyIndex = ref<number | null>(null);
 /** 系统分享只有安卓原生壳有，网页版不显示这个按钮 */
 const canShare = isNativePlatform();
+
+const progress = useAiProgress();
+
+const previewBlob = ref<Blob | null>(null);
+const previewOpen = ref(false);
+const previewLoading = ref(false);
+const previewIndex = ref(0);
 
 const grouped = computed(() => {
   const first = store.records.filter((r) => r.term === 1);
@@ -49,59 +66,77 @@ function openRecord(r: StudyRecord) {
 }
 
 /**
- * 空卡片上的一键起草：只给这一篇，上下文取排在它前面、已有内容的记录。
- * 生成完直接落库（未确认），用户再进页面改。
+ * 空卡片上的一键起草：提示词与承上启下都走 core/record-content，
+ * 上下文只给本篇之前的记录，生成完落库（未确认），用户再进页面改。
  */
 async function draftOne(r: StudyRecord) {
   if (!store.current || busyIndex.value !== null) return;
+  const project = store.current;
   busyIndex.value = r.index;
+  progress.start('record', `正在起草第 ${r.index} 篇记录`);
   try {
+    progress.to('collect');
     const agent = getAgent('report-writer')!;
     const runtime = new AgentRuntime(app.gateway);
-    const prev = store.records
-      .filter((x) => x.index < r.index && (x.work.trim() || x.summary.trim()))
-      .sort((a, b) => a.index - b.index)
-      .map((x) => recordLine(x))
-      .join('\n');
 
+    const flow = buildRecordFlow(project, store.records, r.index);
+    progress.to('history');
+    progress.to('scope', '已确定要承接上一篇的下一步');
+
+    const prompt = recordPrompt(
+      flow,
+      {
+        activityName: r.activityName,
+        stageName: r.stageName,
+        goal: r.goal,
+        work: r.work,
+        outputs: r.outputs,
+        summary: r.summary,
+        recorder: r.recorder || recorderOf(project),
+      },
+      project,
+      ['activityName', 'stageName', 'goal', 'work', 'outputs', 'summary', 'nextPlan'],
+    );
+
+    progress.to('model', '模型正在写…');
     const result = await runtime.run(
       'report-writer',
       agent,
       {
-        project: store.current,
-        records: store.records.filter((x) => x.index <= r.index),
+        project,
+        records: store.records.filter((x) => x.index < r.index),
         activities: [],
         datasets: [],
         sources: store.sources,
       },
-      `为「研究记录 第 ${r.index} 篇（${r.term === 1 ? '上学期' : '下学期'}）」补全内容。
-${prev ? `前面已经写完的记录（只用于承接，不要重复）：\n${prev}\n` : '这是第一篇，前面没有记录。'}
-用户已经填写的信息（这些是事实，只能用这些）：
-- 活动名称：${r.activityName || '（未填）'}
-- 时间：${r.startDate || '未填'} 至 ${r.endDate || '未填'}
-- 阶段名称：${r.stageName || '（未填）'}
-- 参与成员：${r.participants.join('、') || '（未填）'}
-
-这是学校《课题阶段性工作小结记录表》，请只输出 JSON（不要代码块）：
-{"activityName":"","stageName":"","goal":"","work":"","outputs":"","summary":"","nextPlan":""}
-
-${NO_FABRICATION_RULE}
-- 不得写具体数字（份数、人数、百分比）与访谈原话；拿不准的成果写「待补充」。
-- 语言朴素，中学生口吻。`,
+      prompt,
     );
 
+    progress.to('verify', '检查占位词与收尾');
     const json = extractJson(result.text);
     if (!json) throw new Error('模型返回格式无法解析，重试或自己填');
-    const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+    const { fields, repaired } = repairRecordDraft(json as RecordDraftFields, flow);
     const next: StudyRecord = { ...r, updatedAt: Date.now() };
-    for (const k of ['activityName', 'stageName', 'goal', 'work', 'outputs', 'summary', 'nextPlan'] as const) {
-      const v = str(json[k]);
-      if (v) (next as unknown as Record<string, unknown>)[k] = v;
-    }
-    if (!next.activityName) next.activityName = next.work.slice(0, 18) || `第 ${r.index} 阶段`;
+    next.goal = fields.goal ?? next.goal;
+    next.work = fields.work ?? next.work;
+    next.materials = fields.materials ?? next.materials;
+    next.outputs = fields.outputs ?? next.outputs;
+    next.summary = fields.summary ?? next.summary;
+    next.nextPlan = fields.nextPlan ?? next.nextPlan;
+    next.recorder = fields.recorder ?? next.recorder;
+    if (!next.activityName && fields.activityName) next.activityName = fields.activityName;
+    if (!next.stageName && fields.stageName) next.stageName = fields.stageName;
+
     await store.saveRecord(next);
-    app.toast('初稿已生成，点开逐项核对', 'ok', 2600);
+    progress.to('write');
+    if (repaired.length) {
+      app.toast(`有 ${repaired.length} 栏被自动补成完整内容，请核对`, 'ok', 4200);
+    } else {
+      app.toast('草稿已填入，请逐项核对', 'ok');
+    }
+    progress.finish('已写好，记得核对');
   } catch (e) {
+    progress.fail(e instanceof Error ? e.message : String(e));
     app.toast(e instanceof Error ? e.message : String(e), 'error', 6000);
   } finally {
     busyIndex.value = null;
@@ -144,6 +179,23 @@ async function shareOne(r: StudyRecord) {
     busyIndex.value = null;
   }
 }
+
+/** 预览不占用 busyIndex，免得和导出 / 分享互相锁死 */
+async function previewOne(r: StudyRecord) {
+  if (!store.current) return;
+  const project = store.current;
+  previewIndex.value = r.index;
+  previewLoading.value = true;
+  previewBlob.value = null;
+  previewOpen.value = true;
+  try {
+    previewBlob.value = await buildRecordsDocx(project, [r], store.sources);
+  } catch (e) {
+    app.toast(e instanceof Error ? e.message : '预览生成失败', 'error', 5000);
+  } finally {
+    previewLoading.value = false;
+  }
+}
 </script>
 
 <template>
@@ -160,6 +212,8 @@ async function shareOne(r: StudyRecord) {
         <span class="small muted">{{ store.progressStats.percent }}%</span>
       </div>
     </div>
+
+    <AiProgress :progress="progress" />
 
     <p class="muted small tip">
       点一张卡进去写：改完点「保存」，核对过真实细节再点「保存并确认真实」。每篇都能单独导出 DOCX。
@@ -181,7 +235,10 @@ async function shareOne(r: StudyRecord) {
             <p class="rec-desc">
               {{ (r.work || r.goal || '还没有内容').slice(0, 80) }}
             </p>
-            <span class="rec-date">{{ r.startDate || '—' }} ~ {{ r.endDate || '—' }}</span>
+            <span class="rec-date">
+              {{ r.startDate || '—' }} ~ {{ r.endDate || '—' }}
+              <span v-if="r.recorder">· 记录人：{{ r.recorder }}</span>
+            </span>
           </button>
 
           <div class="rec-acts">
@@ -201,6 +258,9 @@ async function shareOne(r: StudyRecord) {
               <button class="btn btn-sm" type="button" :disabled="busyIndex === r.index" @click="exportOne(r, true)">
                 另存为
               </button>
+              <button class="btn btn-sm" type="button" :disabled="previewLoading" @click="previewOne(r)">
+                {{ previewLoading ? '预览生成中…' : '预览' }}
+              </button>
               <button
                 v-if="canShare"
                 class="btn btn-sm"
@@ -215,6 +275,14 @@ async function shareOne(r: StudyRecord) {
         </article>
       </div>
     </section>
+
+    <DocxPreview
+      :open="previewOpen"
+      :blob="previewBlob"
+      :loading="previewLoading"
+      :title="`第 ${previewIndex} 篇 · 研究记录`"
+      @close="previewOpen = false"
+    />
   </div>
 </template>
 

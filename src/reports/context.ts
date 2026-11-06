@@ -17,6 +17,7 @@ import type {
   StudyRecord,
 } from '../core/types';
 import { SOURCE_TYPE_LABEL } from '../core/types';
+import { planOf, recorderOf, recordsForReport, reportScopeText } from '../core/record-content';
 
 export interface ReportContext {
   project: Project;
@@ -71,21 +72,33 @@ export function recordLine(r: StudyRecord, withIndex = true): string {
   if (r.activityName) parts.push(`活动名称：${r.activityName}`);
   if (r.startDate || r.endDate) parts.push(`时间：${r.startDate || '?'} 至 ${r.endDate || '?'}`);
   if (r.place) parts.push(`地点：${r.place}`);
-  if (r.participants.length) parts.push(`参与：${r.participants.join('、')}`);
+  // 旧备份 / 旧库里的记录可能没有这两个数组，别让一行脏数据把整份上下文搞崩
+  const participants = Array.isArray(r.participants) ? r.participants : [];
+  const attachments = Array.isArray(r.attachments) ? r.attachments : [];
+  if (participants.length) parts.push(`参与：${participants.join('、')}`);
+  if (r.recorder) parts.push(`记录人：${r.recorder}`);
   if (r.goal) parts.push(`本阶段主要研究目标：${r.goal}`);
   if (r.work) parts.push(`本阶段主要研究工作：${r.work}`);
   if (r.materials) parts.push(`材料：${r.materials}`);
   if (r.outputs) parts.push(`阶段性成果：${r.outputs}`);
   if (r.summary) parts.push(`工作小结：${r.summary}`);
   if (r.nextPlan) parts.push(`下阶段研究工作安排：${r.nextPlan}`);
-  if (r.attachments.length) parts.push(`附件：${r.attachments.map((a) => a.name).join('、')}`);
+  if (attachments.length) parts.push(`附件：${attachments.map((a) => a.name).join('、')}`);
   parts.push(`来源类型：${SOURCE_TYPE_LABEL[r.sourceType]}${r.confirmed ? '（已确认真实开展）' : '（未确认真实性）'}`);
   return `- ${parts.join('；')}`;
 }
 
-/** 拼成可直接塞进提示词的事实清单 */
-export function contextText(ctx: ReportContext): string {
+/**
+ * 拼成可直接塞进提示词的事实清单。
+ *
+ * kind 决定能看到哪些记录：中期报告只总结上学期，结题报告覆盖整个项目，
+ * 开题报告看到全量但明确写着「不要把未开展写成已完成」。
+ * 不传 kind 时保持旧行为（全量），避免影响其它调用方与既有测试。
+ */
+export function contextText(ctx: ReportContext, kind?: ReportKind): string {
   const { project, records, sources, datasets } = ctx;
+  const plan = planOf(project);
+  const scoped = kind ? recordsForReport(kind, records, plan) : records;
   const lines: string[] = [];
   lines.push('【项目基本信息】');
   lines.push(
@@ -97,15 +110,18 @@ export function contextText(ctx: ReportContext): string {
   lines.push(
     `成员：${project.members.map((m) => `${m.name}${m.role === 'leader' ? '（组长）' : ''}${m.duty ? `，${m.duty}` : '，分工未填'}`).join('；') || '未填写'}`,
   );
+  lines.push(`记录人（默认）：${recorderOf(project)}；过程记录共 ${plan.total} 篇（上学期 ${plan.firstTerm} / 下学期 ${plan.secondTerm}）。`);
   if (project.requirementText) {
     lines.push(`【教师要求原文】\n${project.requirementText.slice(0, 1200)}`);
   }
 
-  lines.push('', `【研究记录】共 ${records.length} 篇`);
-  if (!records.length) {
+  const scope = kind ? reportScopeText(kind, plan, scoped.length) : '';
+  if (scope) lines.push('', scope);
+  lines.push('', `【研究记录】本报告可用 ${scoped.length} 篇（项目内共 ${records.length} 篇）`);
+  if (!scoped.length) {
     lines.push('- 暂无可用的研究记录。');
   } else {
-    for (const r of records) lines.push(recordLine(r));
+    for (const r of scoped) lines.push(recordLine(r));
   }
 
   lines.push('', `【来源】共 ${sources.length} 条`);
@@ -135,10 +151,13 @@ export function contextText(ctx: ReportContext): string {
 export function gapsFor(kind: ReportKind, ctx: ReportContext, mode: GapMode = 'strict'): Gap[] {
   const gaps: Gap[] = [];
   const fill = mode === 'fill';
-  const { project, records, sources, datasets } = ctx;
+  const { project, sources, datasets } = ctx;
+  const plan = planOf(project);
+  // 中期报告的「事实够不够」只看上学期，不能拿下学期的记录来凑
+  const records = recordsForReport(kind, ctx.records, plan);
   const real = records.filter((r) => r.sourceType === 'real' || r.sourceType === 'provided');
   const confirmed = records.filter((r) => r.confirmed);
-  const withResult = records.filter((r) => r.outputs.trim());
+  const withResult = records.filter((r) => (r.outputs ?? '').trim());
 
   if (fill) {
     gaps.push({
@@ -193,7 +212,7 @@ export function gapsFor(kind: ReportKind, ctx: ReportContext, mode: GapMode = 's
   if ((kind === 'midterm' || kind === 'final') && !datasets.length) {
     gaps.push({ level: 'warn', text: '没有数据集，结果部分无法附带统计图表', where: '项目 → 研究记录 / 数据集' });
   }
-  if (kind === 'final' && records.length < Math.min(3, project.recordPlan.total)) {
+  if (kind === 'final' && records.length < Math.min(3, plan.total)) {
     gaps.push({ level: 'warn', text: '记录篇数偏少，结题报告的过程描述会显得单薄', where: '项目 → 研究记录' });
   }
   return gaps;

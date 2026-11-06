@@ -33,7 +33,15 @@ import { NON_AI_SECTIONS, templateFor } from '../reports/templates';
 import { runCombinedSearch } from '../search/providers';
 import { open_ } from '../core/crypto';
 import { defaultWorkflow, selectSteps, gateNeedsConfirm, WORKFLOW_ID } from './graph';
-import { batchCount, draftMessages, parseDrafts, termName, type DraftRecord } from './record-draft';
+import {
+  batchCount,
+  draftMessages,
+  parseDrafts,
+  sanitizeDrafts,
+  termName,
+  type DraftRecord,
+} from './record-draft';
+import { planOf, recorderOf } from '../core/record-content';
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -682,7 +690,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     // 项目创建时已经建好空白占位记录：这一步填的是这些占位，不是再新增一批
     let termRecs = termRecords(term);
     while (termRecs.length < target) {
-      const rec = blankRecord(p.id, term, termRecs.length + 1);
+      const rec = blankRecord(p.id, term, termRecs.length + 1, recorderOf(p));
       await db.records.put(rec);
       projects.records.push(rec);
       termRecs = termRecords(term);
@@ -761,6 +769,22 @@ export const useWorkflowStore = defineStore('workflow', () => {
   }
 
   async function draftBatch(p: NonNullable<typeof projects.current>, term: Term, n: number, from: number) {
+    const plan = planOf(p);
+    const startIndex = from + 1;
+    const recorder = recorderOf(p);
+    // 只把本批之前、已经有内容的记录交给模型：后面还没发生的不能当依据
+    const history = projects.records
+      .filter((r) => r.index < startIndex && (r.work?.trim() || r.summary?.trim()))
+      .sort((a, b) => a.index - b.index)
+      .map((r) => ({
+        index: r.index,
+        activityName: r.activityName,
+        goal: r.goal,
+        work: r.work,
+        outputs: r.outputs,
+        summary: r.summary,
+        nextPlan: r.nextPlan,
+      }));
     const ctx = {
       topic: p.topic,
       grade: p.grade,
@@ -768,6 +792,9 @@ export const useWorkflowStore = defineStore('workflow', () => {
       members: (p.members ?? []).map((m) => m.name).filter(Boolean),
       startDate: p.startDate,
       endDate: p.endDate,
+      history,
+      plan,
+      recorder,
     };
     const res = await withTimeout(
       app.gateway.chat({
@@ -780,10 +807,17 @@ export const useWorkflowStore = defineStore('workflow', () => {
       120_000,
       `${termName(term)}过程记录草稿`,
     );
-    return parseDrafts(res.text, n);
+    const parsed = parseDrafts(res.text, n);
+    return sanitizeDrafts(parsed, {
+      startIndex,
+      plan,
+      topic: p.topic,
+      recorder,
+      prevNextPlan: history.length ? history[history.length - 1].nextPlan ?? '' : '',
+    });
   }
 
-  function blankRecord(projectId: string, term: Term, index: number): StudyRecord {
+  function blankRecord(projectId: string, term: Term, index: number, recorder = ''): StudyRecord {
     return {
       id: uid('rec'),
       projectId,
@@ -795,7 +829,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
       endDate: '',
       place: '',
       participants: [],
-      recorder: '',
+      recorder,
       recordedAt: todayISO(),
       goal: '',
       work: '',
@@ -830,6 +864,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
     rec.outputs = d.outputs;
     rec.summary = d.summary;
     rec.nextPlan = d.nextPlan;
+    rec.recorder = d.recorder?.trim() || rec.recorder?.trim() || (projects.current ? recorderOf(projects.current) : '课题组成员');
+    rec.recordedAt = d.recordedAt?.trim() || rec.recordedAt || todayISO();
     rec.confirmed = false;
     rec.updatedAt = Date.now();
   }
@@ -945,7 +981,11 @@ export const useWorkflowStore = defineStore('workflow', () => {
       return;
     }
 
-    const ctxText = contextText({ project: p, records: projects.records, sources: projects.sources, datasets: projects.datasets });
+    // 中期只喂上学期记录，结题喂全项目；报告范围在 contextText 里写明
+    const ctxText = contextText(
+      { project: p, records: projects.records, sources: projects.sources, datasets: projects.datasets },
+      kind,
+    );
     const written: string[] = [];
     let spent = 0;
     for (const section of targets) {

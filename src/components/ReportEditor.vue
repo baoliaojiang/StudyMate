@@ -5,7 +5,7 @@
  * 结构：章节树（可改名、可增删）+ 正文 + AI 起草 + 导出。
  * AI 只能拿到「已有事实 + 缺口清单」，缺信息就写「待补充」，不许编。
  */
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useAppStore } from '../stores/app';
 import { useProjectStore } from '../stores/projects';
 import type { Report, ReportSection, ReportStatus } from '../core/types';
@@ -15,9 +15,13 @@ import { FILL_DISCLAIMER, contextText, gapsFor, sectionPrompt } from '../reports
 import { detectHeadings, type DetectedHeading } from '../reports/importTemplate';
 import { buildReportDocx, reportToMarkdown } from '../docx/builder';
 import { printReport } from '../export/pdf';
+import { saveFile } from '../export/save';
 import MarkdownText from './MarkdownText.vue';
+import DocxPreview from './DocxPreview.vue';
+import AiProgress from './AiProgress.vue';
+import { useAiProgress } from '../core/ai-progress';
+import { cleanReport, hasAiMarks, AI_CLEAN_WARNING } from '../core/ai-clean';
 import { looksLikePlanning, stripInlineThink } from '../reports/guard';
-import { renderAsync } from 'docx-preview';
 import { uid } from '../core/id';
 import { getAgent } from '../agents/definitions';
 import { AgentRuntime } from '../agents/runtime';
@@ -33,6 +37,7 @@ const active = ref<string>(draft.value.sections[0]?.id ?? '');
 const dirty = ref(false);
 const lastWarnings = ref<string[]>([]);
 const generating = ref<string | null>(null);
+const progress = useAiProgress();
 
 const previewOpen = ref(false);
 const importOpen = ref(false);
@@ -97,7 +102,7 @@ const sectionSources = computed(() =>
 );
 
 function ctxTextForSection(): string {
-  const base = contextText(ctx.value);
+  const base = contextText(ctx.value, draft.value.kind);
   if (!sectionSources.value.length) return base;
   const lines = sectionSources.value.map(
     (s) =>
@@ -165,7 +170,9 @@ async function generateSection() {
 
   const sp = spec.value;
   generating.value = s.id;
+  progress.start('report', `正在起草「${s.heading}」`);
   try {
+    progress.to('collect');
     const agent = getAgent('report-writer')!;
     const runtime = new AgentRuntime(app.gateway);
     const ctx = {
@@ -194,12 +201,15 @@ async function generateSection() {
         '」「',
       )}」这类句子，不是正文。这次直接从正文第一句写起，不要任何关于「怎么写」「还缺什么」的描述。`;
 
+    progress.to('model', '模型正在写这一节…');
     let result = await runtime.run('report-writer', agent, ctx, base());
+    progress.to('verify', '检查正文与事实边界');
     // 内联 <think> 标签先剥出来：思考归思考，正文归正文
     let clean = stripInlineThink(result.text);
     let verdict = looksLikePlanning(clean.text);
 
     if (verdict.bad) {
+      progress.setDetail('返回的是写作思路，正在重写一次');
       app.toast('这次返回的是写作思路而不是正文，正在重写一次', 'info', 3200);
       result = await runtime.run('report-writer', agent, ctx, strict(verdict.hits));
       clean = stripInlineThink(result.text);
@@ -210,12 +220,14 @@ async function generateSection() {
       lastWarnings.value = [
         '这次只拿到了思考过程，没有正文。可以关闭深度思考、换个模型，或把输出额度调大再试。',
       ];
+      progress.fail('这次只返回了思考过程，正文是空的，没有写入');
       app.toast('这次只返回了思考过程，正文是空的，没有写入', 'warn', 6000);
       return;
     }
     // 仍然像思路：宁可不写，也不把 AI 的自言自语留在正文里
     if (verdict.bad) {
       lastWarnings.value = [`模型连续两次只给了写作思路（${verdict.hits.slice(0, 2).join('、')}），已丢弃，未覆盖原内容。`];
+      progress.fail('模型连续两次只给了思路，已丢弃，原内容没动');
       app.toast('模型连续两次只给了思路而不是正文，已丢弃，原内容没动。换个更强的模型再试。', 'warn', 7000);
       return;
     }
@@ -227,6 +239,7 @@ async function generateSection() {
     lastWarnings.value = result.warnings;
     dirty.value = true;
     await save();
+    progress.finish(`已写入「${s.heading}」，记得核对`);
     app.toast(
       result.reasoning
         ? `已生成「${s.heading}」（思考过程没有写入正文）`
@@ -234,6 +247,7 @@ async function generateSection() {
       'ok',
     );
   } catch (e) {
+    progress.fail(e instanceof Error ? e.message : String(e));
     app.toast(e instanceof Error ? e.message : String(e), 'error', 6000);
   } finally {
     generating.value = null;
@@ -291,6 +305,27 @@ async function fillPlaceholders() {
   dirty.value = true;
   await save();
   app.toast(n ? `已为 ${n} 个空章节写入「待补充」说明` : '没有空章节', 'info', 2600);
+}
+
+/** 一键清理补全模式写进正文的 AI 标注，删除后不可撤销 */
+async function cleanAiMarks() {
+  if (!draft.value.sections.some((s) => hasAiMarks(s.body))) {
+    app.toast('这一份报告里没有可清理的 AI 标注', 'info');
+    return;
+  }
+  const ok = await askConfirm({
+    title: '清理 AI 生成标注',
+    message: AI_CLEAN_WARNING,
+    confirmText: '仍然清理',
+    cancelText: '先不清理',
+    tone: 'warn',
+  });
+  if (!ok) return;
+  const out = cleanReport(draft.value);
+  draft.value = out.report;
+  dirty.value = true;
+  await save();
+  app.toast(`已清理 ${out.removed} 处标注，删除后无法撤销`, 'ok', 4200);
 }
 
 /* ---------------- 章节字段编辑 ---------------- */
@@ -435,10 +470,10 @@ async function resetTemplate() {
  * 真实 DOCX 预览
  *
  * 「预览版式」是拿数据自己画的纸样，跟导出的文件可能差一点点；
- * 这里直接把要下载的那份 blob 交给 docx-preview 渲染，所见即所得。
+ * 这里直接把要下载的那份 blob 交给 DocxPreview 组件渲染，所见即所得。
  */
 const docxPreviewOpen = ref(false);
-const docxHost = ref<HTMLElement | null>(null);
+const docxBlob = ref<Blob | null>(null);
 const docxLoading = ref(false);
 
 async function previewDocx() {
@@ -449,24 +484,15 @@ async function previewDocx() {
   }
   docxPreviewOpen.value = true;
   docxLoading.value = true;
+  // 先清掉上一次的 blob：本次生成失败时不要把旧文件留在预览里
+  docxBlob.value = null;
   try {
     if (dirty.value) await save();
     const kind = draft.value.kind === 'progress' ? 'proposal' : (draft.value.kind as 'proposal' | 'midterm' | 'final');
     const blob = await buildReportDocx(kind, store.current, draft.value, store.sources, store.records, {
       cover: kind === 'final' && addCover.value,
     });
-    await nextTick();
-    if (docxHost.value) {
-      docxHost.value.innerHTML = '';
-      await renderAsync(blob, docxHost.value, undefined, {
-        className: 'docx',
-        inWrapper: true,
-        breakPages: true,
-        ignoreLastRenderedPageBreak: false,
-        experimental: true,
-        useBase64URL: true,
-      });
-    }
+    docxBlob.value = blob;
   } catch (e) {
     app.toast(e instanceof Error ? e.message : '预览失败，可以先导出到 Word 打开', 'error', 5200);
   } finally {
@@ -487,14 +513,11 @@ async function exportDocx() {
     const blob = await buildReportDocx(kind, store.current, draft.value, store.sources, store.records, {
       cover: kind === 'final' && addCover.value,
     });
-    download(blob, `${(exportName.value || defaultName.value).replace(/[\\/:*?"<>|]/g, '_')}.docx`);
-    app.toast(
-      kind === 'final' && addCover.value
-        ? 'DOCX 已导出。目录是 Word 域，首次打开需右键「更新域」。'
-        : 'DOCX 已导出，版式与学校下发的表格一致。',
-      'ok',
-      5200,
-    );
+    const res = await saveFile(blob, `${(exportName.value || defaultName.value).replace(/[\\/:*?"<>|]/g, '_')}.docx`);
+    app.toast(res.how === 'cancelled' ? '没有保存' : res.note, res.how === 'cancelled' ? 'info' : 'ok', 3200);
+    if (res.how !== 'cancelled' && kind === 'final' && addCover.value) {
+      app.toast('目录是 Word 域，首次打开需右键「更新域」。', 'info', 5200);
+    }
   } catch (e) {
     app.toast(e instanceof Error ? e.message : '导出失败', 'error', 5000);
   } finally {
@@ -502,10 +525,18 @@ async function exportDocx() {
   }
 }
 
-function exportMarkdown() {
+async function exportMarkdown() {
   if (!store.current) return;
-  const md = reportToMarkdown(store.current, draft.value, store.sources);
-  download(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${(exportName.value || defaultName.value).replace(/[\\/:*?"<>|]/g, '_')}.md`);
+  try {
+    const md = reportToMarkdown(store.current, draft.value, store.sources);
+    const res = await saveFile(
+      new Blob([md], { type: 'text/markdown;charset=utf-8' }),
+      `${(exportName.value || defaultName.value).replace(/[\\/:*?"<>|]/g, '_')}.md`,
+    );
+    app.toast(res.note, res.how === 'cancelled' ? 'info' : 'ok');
+  } catch (e) {
+    app.toast(e instanceof Error ? e.message : '导出失败', 'error', 5000);
+  }
 }
 
 /** PDF 导出：走系统打印，在打印对话框里选「另存为 PDF」 */
@@ -522,15 +553,6 @@ function exportPdf() {
     : '';
   printReport(name, `${store.current.topic} · ${store.current.groupName || ''}`, md, simNote);
   app.toast('已打开打印窗口：目标打印机选「另存为 PDF」即可导出', 'info', 5200);
-}
-
-function download(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 const previewSections = computed(() => draft.value.sections);
@@ -602,6 +624,8 @@ async function setStatus(next: ReportStatus) {
       </div>
 
       <div v-if="section" class="body-inner">
+        <AiProgress :progress="progress" />
+
         <div class="body-head">
           <div class="grow">
             <h2 class="sec-title">{{ section.heading }}</h2>
@@ -773,6 +797,9 @@ async function setStatus(next: ReportStatus) {
         <p class="muted small" style="margin: 0; line-height: 1.7">
           {{ simSections.length ? `本报告有 ${simSections.length} 节含模拟内容，导出时会加提示框。` : '本报告暂无模拟内容标记。' }}
         </p>
+        <button class="btn btn-sm btn-block" style="margin-top: 10px" type="button" @click="cleanAiMarks">
+          清理 AI 标注
+        </button>
       </div>
 
       <button class="btn btn-sm btn-block" style="margin-top: 12px" type="button" :disabled="generating !== null || blocking.length > 0" @click="generateAll">
@@ -781,20 +808,13 @@ async function setStatus(next: ReportStatus) {
     </div>
 
     <!-- 预览 -->
-    <!-- 真实 DOCX 预览：渲染的就是将要下载的那份文件 -->
-    <div v-if="docxPreviewOpen" class="modal-scrim docx-scrim" @click.self="docxPreviewOpen = false">
-      <div class="docx-card">
-        <div class="modal-head">
-          <b>DOCX 预览</b>
-          <span class="muted small">与导出的文件一致，只影响显示效果</span>
-          <button class="x" type="button" aria-label="关闭" @click="docxPreviewOpen = false">×</button>
-        </div>
-        <div class="docx-scroll">
-          <div ref="docxHost" class="docx-host" />
-          <p v-if="docxLoading" class="docx-loading">正在生成并渲染…</p>
-        </div>
-      </div>
-    </div>
+    <DocxPreview
+      :open="docxPreviewOpen"
+      :blob="docxBlob"
+      :loading="docxLoading"
+      title="DOCX 预览"
+      @close="docxPreviewOpen = false"
+    />
 
     <div v-if="previewOpen" class="modal-scrim" @click.self="previewOpen = false">
       <div class="preview">
@@ -951,32 +971,6 @@ async function setStatus(next: ReportStatus) {
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field-label { font-size: calc(11px * var(--font-scale)); color: var(--text-3); }
 
-.docx-scrim { padding: 0; }
-.docx-card {
-  width: min(900px, 100%); height: 100%;
-  display: flex; flex-direction: column;
-  background: var(--bg);
-}
-.docx-scroll {
-  flex: 1 1 auto; min-height: 0; overflow: auto;
-  padding: 14px;
-  background: #6b6b6b;
-  position: relative;
-}
-/* docx-preview 渲染出来的是白纸黑字，暗色主题下也保持白底，否则文字看不见 */
-.docx-host { color: #111; }
-.docx-host :deep(.docx-wrapper) { background: transparent; padding: 0; }
-.docx-host :deep(.docx-wrapper > section.docx) {
-  margin: 0 auto 14px !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
-  background: #fff;
-}
-.docx-loading {
-  position: absolute; inset: 0; margin: 0;
-  display: grid; place-items: center;
-  color: #fff; font-size: calc(12.5px * var(--font-scale));
-}
-
 .modal-scrim {
   position: fixed; inset: 0; z-index: 110;
   background: var(--scrim);
@@ -999,25 +993,25 @@ async function setStatus(next: ReportStatus) {
 
 .paper {
   flex: 1; overflow-y: auto;
-  background: var(--surface);
+  background: #fff; color: #1a1a1a;
   padding: 32px 40px 48px;
   font-family: var(--font-serif);
 }
 .paper-head { text-align: center; margin-bottom: 26px; }
 .paper-body { font-size: calc(12.5px * var(--font-scale)); line-height: 1.9; color: #1a1a1a; }
 .paper-body :deep(.md) { color: inherit; font-size: inherit; line-height: inherit; }
-.paper-school { font-size: calc(13px * var(--font-scale)); color: var(--text-2); margin-bottom: 6px; }
-.paper-head h1 { font-size: calc(22px * var(--font-scale)); margin: 0 0 10px; }
-.paper-meta { display: flex; flex-direction: column; gap: 3px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-2); }
+.paper-school { font-size: calc(13px * var(--font-scale)); color: #444; margin-bottom: 6px; }
+.paper-head h1 { font-size: calc(22px * var(--font-scale)); margin: 0 0 10px; color: #1a1a1a; }
+.paper-meta { display: flex; flex-direction: column; gap: 3px; font-size: calc(11.5px * var(--font-scale)); color: #444; }
 .paper-sec { margin-bottom: 16px; }
-.paper-sec h2 { font-size: calc(14px * var(--font-scale)); margin: 0 0 6px; }
+.paper-sec h2 { font-size: calc(14px * var(--font-scale)); margin: 0 0 6px; color: #1a1a1a; }
 .paper-sec h2.lv2 { font-size: calc(13px * var(--font-scale)); margin-left: 12px; }
-.paper-sec p { margin: 0 0 6px; font-size: calc(12.5px * var(--font-scale)); line-height: 1.9; text-indent: 2em; color: var(--text); }
-.paper-sim { font-size: calc(10.5px * var(--font-scale)); color: var(--sim); }
-.paper-refs { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); }
-.paper-refs h2 { font-size: calc(14px * var(--font-scale)); margin: 0 0 8px; }
-.paper-refs p { margin: 0 0 5px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.7; }
-.ref-type { margin-left: 6px; color: var(--text-3); }
+.paper-sec p { margin: 0 0 6px; font-size: calc(12.5px * var(--font-scale)); line-height: 1.9; text-indent: 2em; color: #1a1a1a; }
+.paper-sim { font-size: calc(10.5px * var(--font-scale)); color: #a33; }
+.paper-refs { margin-top: 24px; padding-top: 14px; border-top: 1px solid #e6e6e2; }
+.paper-refs h2 { font-size: calc(14px * var(--font-scale)); margin: 0 0 8px; color: #1a1a1a; }
+.paper-refs p { margin: 0 0 5px; font-size: calc(11.5px * var(--font-scale)); line-height: 1.7; color: #1a1a1a; }
+.ref-type { margin-left: 6px; color: #666; }
 
 .detected { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
 .detected-head { font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); margin-bottom: 8px; }
@@ -1040,6 +1034,9 @@ async function setStatus(next: ReportStatus) {
   .main-input { min-height: 300px; }
   .side { grid-template-columns: 1fr; }
   .hint-row { flex-direction: column; }
-  .paper { padding: 20px; }
+  .modal-scrim { padding: 0; }
+  .preview { width: 100%; max-height: none; height: 100dvh; border-radius: 0; }
+  .preview-bar { padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+  .paper { padding: 18px 16px 40px; }
 }
 </style>

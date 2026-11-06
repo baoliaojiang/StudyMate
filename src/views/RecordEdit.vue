@@ -11,7 +11,19 @@ import { useAppStore } from '../stores/app';
 import { useProjectStore } from '../stores/projects';
 import type { Attachment, StudyRecord } from '../core/types';
 import { RECORD_FIELDS } from '../reports/templates';
-import { NO_FABRICATION_RULE, recordLine } from '../reports/context';
+import {
+  buildRecordFlow,
+  recordPrompt,
+  repairRecordDraft,
+  recorderOf,
+  type RecordDraftFields,
+} from '../core/record-content';
+import { useAiProgress } from '../core/ai-progress';
+import AiProgress from '../components/AiProgress.vue';
+import { cleanRecord, hasAiMarks, AI_CLEAN_WARNING } from '../core/ai-clean';
+import { askConfirm } from '../core/task-guard';
+import { buildRecordsDocx } from '../docx/builder';
+import DocxPreview from '../components/DocxPreview.vue';
 import { resizeImage } from '../core/image';
 import { getAgent } from '../agents/definitions';
 import { AgentRuntime } from '../agents/runtime';
@@ -30,6 +42,12 @@ const saving = ref(false);
 const exporting = ref(false);
 const canShare = isNativePlatform();
 
+const progress = useAiProgress();
+
+const previewBlob = ref<Blob | null>(null);
+const previewOpen = ref(false);
+const previewLoading = ref(false);
+
 const index = computed(() => Number(route.params.index ?? 0));
 
 onMounted(async () => {
@@ -43,7 +61,10 @@ onMounted(async () => {
       router.replace(`/project/${route.params.id}?tab=records`);
       return;
     }
-    draft.value = JSON.parse(JSON.stringify(found));
+    const loaded: StudyRecord = JSON.parse(JSON.stringify(found));
+    if (!loaded.recorder && store.current) loaded.recorder = recorderOf(store.current);
+    if (!loaded.recordedAt) loaded.recordedAt = new Date().toISOString().slice(0, 10);
+    draft.value = loaded;
   } catch (e) {
     app.toast(e instanceof Error ? e.message : '打不开这一篇', 'error', 5000);
     router.replace(`/project/${route.params.id}?tab=records`);
@@ -83,73 +104,86 @@ async function save(alsoConfirm = false) {
     await store.saveRecord(draft.value);
     app.toast(alsoConfirm ? '已保存并确认为真实记录' : '已保存', 'ok', 1600);
     if (alsoConfirm) back();
+  } catch (e) {
+    // 保存失败必须说出来：以前这里只有 finally，写库报错会静默丢掉整页内容
+    app.toast(`保存失败：${e instanceof Error ? e.message : String(e)}`, 'error', 6000);
   } finally {
     saving.value = false;
   }
 }
 
 /**
- * 让 AI 起草。
- *
- * 上下文按「这一篇能看见什么」给：只给排在它前面、且已经有内容的记录（第 3 篇看第 1-2 篇），
- * 后面还没发生的不能拿来做依据，否则会前后矛盾。
- * 只把正文写回六个格子，思考过程不落进正文。
+ * 让 AI 起草：提示词、承上启下与兜底都走 core/record-content，
+ * 上下文只给本篇之前的记录，正文经 repairRecordDraft 逐栏补齐。
  */
 async function generate() {
-  if (!draft.value || !store.current) return;
+  const rec = draft.value;
+  if (!rec || !store.current) return;
+  const project = store.current;
   generating.value = true;
   warnings.value = [];
+  progress.start('record', `正在起草第 ${rec.index} 篇记录`);
   try {
+    progress.to('collect');
     const agent = getAgent('report-writer')!;
     const runtime = new AgentRuntime(app.gateway);
-    const prev = store.records
-      .filter((r) => r.index < draft.value!.index && (r.work.trim() || r.summary.trim()))
-      .sort((a, b) => a.index - b.index)
-      .map((r) => recordLine(r))
-      .join('\n');
 
+    const flow = buildRecordFlow(project, store.records, rec.index);
+    progress.to('history');
+    progress.to('scope', '已确定要承接上一篇的下一步');
+
+    const prompt = recordPrompt(
+      flow,
+      {
+        activityName: rec.activityName,
+        stageName: rec.stageName,
+        goal: rec.goal,
+        work: rec.work,
+        outputs: rec.outputs,
+        summary: rec.summary,
+        recorder: rec.recorder,
+      },
+      project,
+      ['goal', 'work', 'materials', 'outputs', 'summary', 'nextPlan'],
+    );
+
+    progress.to('model', '模型正在写…');
     const result = await runtime.run(
       'report-writer',
       agent,
       {
-        project: store.current,
-        records: store.records.filter((r) => r.index <= draft.value!.index),
+        project,
+        records: store.records.filter((r) => r.index < rec.index),
         activities: [],
         datasets: [],
         sources: store.sources,
       },
-      `为「研究记录 第 ${draft.value.index} 篇（${termText.value}）」补全内容。
-${prev ? `前面已经写完的记录（只用于承接，不要重复它们的活动）：\n${prev}\n` : '这是第一篇，前面没有记录。'}
-用户已经填写的信息（这些是事实，只能用这些）：
-- 活动名称：${draft.value.activityName || '（未填）'}
-- 时间：${draft.value.startDate || '未填'} 至 ${draft.value.endDate || '未填'}
-- 地点：${draft.value.place || '（未填）'}
-- 参与成员：${draft.value.participants.join('、') || '（未填）'}
-- 阶段名称：${draft.value.stageName || '（未填）'}
-- 本阶段主要研究目标：${draft.value.goal || '（空）'}
-- 本阶段主要研究工作：${draft.value.work || '（空）'}
-- 材料（表格里没有这一栏，仅存档）：${draft.value.materials || '（空）'}
-- 阶段性成果：${draft.value.outputs || '（空）'}
-
-这是学校《课题阶段性工作小结记录表》，只有六个格子：「起迄时间 / 本阶段主要研究目标 / 本阶段主要研究工作 / 阶段性成果 / 工作小结 / 下阶段研究工作安排」。
-请输出 JSON（不要代码块、不要解释），键必须与格子对应：
-{"goal":"","work":"","outputs":"","summary":"","nextPlan":""}
-
-${NO_FABRICATION_RULE}
-- 用户没写活动名称与内容时，"work" 只能写「本阶段尚未开展具体研究活动（待补充真实记录）」。
-- 不得写具体数字（份数、人数、百分比）与访谈原话，除非用户已提供。
-- 语言朴素，中学生的口吻，不要写成公文。`,
+      prompt,
     );
 
+    progress.to('verify', '检查占位词与收尾');
     const json = extractJson(result.text);
     if (!json) throw new Error('模型返回格式无法解析，请手动填写或重试');
-    for (const f of RECORD_FIELDS) {
-      const v = json[f.key];
-      if (typeof v === 'string' && v.trim()) (draft.value as any)[f.key] = v.trim();
-    }
+    const { fields, repaired } = repairRecordDraft(json as RecordDraftFields, flow);
+    rec.goal = fields.goal ?? rec.goal;
+    rec.work = fields.work ?? rec.work;
+    rec.materials = fields.materials ?? rec.materials;
+    rec.outputs = fields.outputs ?? rec.outputs;
+    rec.summary = fields.summary ?? rec.summary;
+    rec.nextPlan = fields.nextPlan ?? rec.nextPlan;
+    rec.recorder = fields.recorder ?? rec.recorder;
+    if (!rec.activityName && fields.activityName) rec.activityName = fields.activityName;
+    if (!rec.stageName && fields.stageName) rec.stageName = fields.stageName;
     warnings.value = result.warnings;
-    app.toast('草稿已填入，请逐项核对', 'ok');
+    progress.to('write');
+    if (repaired.length) {
+      app.toast(`有 ${repaired.length} 栏被自动补成完整内容，请核对`, 'ok', 4200);
+    } else {
+      app.toast('草稿已填入，请逐项核对', 'ok');
+    }
+    progress.finish('已写好，记得核对');
   } catch (e) {
+    progress.fail(e instanceof Error ? e.message : String(e));
     app.toast(e instanceof Error ? e.message : String(e), 'error', 6000);
   } finally {
     generating.value = false;
@@ -164,6 +198,44 @@ function extractJson(text: string): Record<string, unknown> | null {
     return JSON.parse(text.slice(s, e + 1));
   } catch {
     return null;
+  }
+}
+
+/** 一键清理 AI 生成标注：只改草稿，不自动落库，用户自己点保存 */
+async function cleanAiMarks() {
+  const rec = draft.value;
+  if (!rec) return;
+  const keys = ['goal', 'work', 'materials', 'outputs', 'summary', 'nextPlan'] as const;
+  const textOf = rec as unknown as Record<string, string>;
+  if (!keys.some((k) => hasAiMarks(textOf[k] ?? ''))) {
+    app.toast('这一篇里没有可清理的 AI 标注', 'info');
+    return;
+  }
+  const ok = await askConfirm({
+    title: '清理 AI 生成标注',
+    message: AI_CLEAN_WARNING,
+    confirmText: '仍然清理',
+    cancelText: '先不清理',
+    tone: 'warn',
+  });
+  if (!ok) return;
+  const out = cleanRecord(rec);
+  draft.value = out.record;
+  app.toast(`已清理 ${out.removed} 处，点「保存」后生效`, 'ok', 4200);
+}
+
+async function previewOne(rec: StudyRecord) {
+  if (!store.current) return;
+  const project = store.current;
+  previewLoading.value = true;
+  previewBlob.value = null;
+  previewOpen.value = true;
+  try {
+    previewBlob.value = await buildRecordsDocx(project, [rec], store.sources);
+  } catch (e) {
+    app.toast(e instanceof Error ? e.message : '预览生成失败', 'error', 5000);
+  } finally {
+    previewLoading.value = false;
   }
 }
 
@@ -250,6 +322,8 @@ async function doShare() {
     <template v-else>
       <div class="pane">
         <div class="board">
+          <AiProgress :progress="progress" />
+
           <label class="field">
             <span class="field-label">这次做了什么</span>
             <input v-model="draft.activityName" class="input" placeholder="一句话说明这一篇的活动" />
@@ -279,6 +353,17 @@ async function doShare() {
             <label class="field">
               <span class="field-label">参与成员</span>
               <input v-model="participantsText" class="input" placeholder="用顿号分开：张三、李四" />
+            </label>
+          </div>
+
+          <div class="two">
+            <label class="field">
+              <span class="field-label">记录人</span>
+              <input v-model="draft.recorder" class="input" placeholder="选填" />
+            </label>
+            <label class="field">
+              <span class="field-label">记录时间</span>
+              <input v-model="draft.recordedAt" class="input" type="date" />
             </label>
           </div>
 
@@ -320,7 +405,11 @@ async function doShare() {
           {{ exporting ? '导出中…' : '导出 DOCX' }}
         </button>
         <button class="btn btn-sm" type="button" :disabled="exporting" @click="doExport(true)">另存为…</button>
+        <button class="btn btn-sm" type="button" :disabled="previewLoading" @click="previewOne(draft)">
+          {{ previewLoading ? '预览生成中…' : '预览 DOCX' }}
+        </button>
         <button v-if="canShare" class="btn btn-sm" type="button" :disabled="exporting" @click="doShare">分享</button>
+        <button class="btn btn-sm" type="button" @click="cleanAiMarks">清理 AI 标注</button>
         <div class="grow" />
         <button class="btn btn-sm btn-primary" type="button" :disabled="generating" @click="generate">
           {{ generating ? '正在起草…' : 'AI 生成初稿' }}
@@ -329,6 +418,14 @@ async function doShare() {
         <button class="btn btn-sm btn-primary" type="button" :disabled="saving" @click="save(true)">保存并确认真实</button>
       </div>
     </template>
+
+    <DocxPreview
+      :open="previewOpen"
+      :blob="previewBlob"
+      :loading="previewLoading"
+      :title="`第 ${index} 篇 · 研究记录`"
+      @close="previewOpen = false"
+    />
   </div>
 </template>
 

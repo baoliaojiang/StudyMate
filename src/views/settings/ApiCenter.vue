@@ -13,7 +13,7 @@ import { db, type ProviderRow } from '../../core/db';
 import { useAppStore } from '../../stores/app';
 import { maskKey, seal } from '../../core/crypto';
 import { uid } from '../../core/id';
-import { downloadBlob } from '../../export/bundle';
+import { saveText } from '../../export/save';
 import {
   clearKey,
   describeError,
@@ -459,13 +459,17 @@ async function doExportKeys() {
   }
   try {
     const bundle = await exportKeyBundle(providers.value, passphrase.value);
-    downloadBlob(
-      new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
+    const res = await saveText(
+      JSON.stringify(bundle, null, 2),
       `studymate-keys-${new Date().toISOString().slice(0, 10)}.json`,
     );
+    if (res.how === 'cancelled') {
+      keyNotice.value = '没有保存。';
+      return;
+    }
     passphrase.value = '';
     passphrase2.value = '';
-    keyNotice.value = '导出完成。文件内容为密文，本软件不保存口令，遗失后无法找回。';
+    keyNotice.value = `导出完成（${res.note}）。文件内容为密文，本软件不保存口令，遗失后无法找回。`;
   } catch (e) {
     keyError.value = describeError(e);
   }

@@ -11,7 +11,8 @@
 import PptxGenJS from 'pptxgenjs';
 import type { Dataset, Deck, Project, SlideItem } from '../core/types';
 import { deckToNotes, type DeckFacts } from '../ppt/model';
-import { downloadBlob, safeName } from './bundle';
+import { safeName } from './bundle';
+import { saveFile, type SaveResult } from './save';
 
 type Pptx = InstanceType<typeof PptxGenJS>;
 type Slide = ReturnType<Pptx['addSlide']>;
@@ -221,15 +222,15 @@ function renderSlide(
 }
 
 /** 下载 PPTX（真正的 Office Open XML 演示文稿） */
-export async function exportDeckPptx(deck: Deck, project: Project, datasets: Dataset[]): Promise<void> {
+export async function exportDeckPptx(deck: Deck, project: Project, datasets: Dataset[]): Promise<SaveResult> {
   const blob = await buildPptx(deck, project, datasets);
-  downloadBlob(blob, `${safeName(project.topic)}_结题答辩.pptx`);
+  return saveFile(blob, `${safeName(project.topic)}_结题答辩.pptx`);
 }
 
 /** 讲稿：和 PPT 一一对应，方便自己改成口播词 */
-export function exportDeckNotes(deck: Deck, facts: DeckFacts): void {
+export async function exportDeckNotes(deck: Deck, facts: DeckFacts): Promise<SaveResult> {
   const md = deckToNotes(deck, facts);
-  downloadBlob(
+  return saveFile(
     new Blob([md], { type: 'text/markdown;charset=utf-8' }),
     `${safeName(facts.project.topic)}_答辩讲稿.md`,
   );

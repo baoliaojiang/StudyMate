@@ -7,8 +7,9 @@ import {
   reportToMarkdown,
 } from '../docx/builder';
 import { preflight, renderChecklist, summarizeChecks } from './preflight';
-import { downloadBlob } from './download';
+import { saveFile, type SaveResult } from './save';
 
+// 保留旧出口：PPT / API 中心还在用；新的文档导出一律走 saveFile
 export { downloadBlob } from './download';
 
 export interface BundleInput {
@@ -56,7 +57,7 @@ export async function exportOne(
   kind: 'proposal' | 'midterm' | 'final' | 'progress' | 'md',
   input: BundleInput,
   sel: ExportSelection = {},
-): Promise<void> {
+): Promise<SaveResult> {
   const { project, reports, records, sources } = input;
   const base = safeName(`${project.topic}_${project.groupName || ''}`);
 
@@ -64,25 +65,23 @@ export async function exportOne(
     const picked = selectRecords(records, sel);
     if (!picked.length) throw new Error('选中的范围内没有研究记录');
     const blob = await buildRecordsDocx(project, picked, sources);
-    downloadBlob(blob, `${base}_研究记录（${picked.length}篇）.docx`);
-    return;
+    return saveFile(blob, `${base}_研究记录（${picked.length}篇）.docx`);
   }
   if (kind === 'md') {
     const md = [
       ...reports.map((r) => reportToMarkdown(project, r, sources)),
       recordsToMarkdown(project, records),
     ].join('\n\n---\n\n');
-    downloadBlob(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${base}_全部报告.md`);
-    return;
+    return saveFile(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${base}_全部报告.md`);
   }
   const report = reports.find((r) => r.kind === kind);
   if (!report) throw new Error(`找不到 ${kind} 报告`);
   const blob = await buildReportDocx(kind, project, report, sources, records);
-  downloadBlob(blob, `${base}_${report.title}.docx`);
+  return saveFile(blob, `${base}_${report.title}.docx`);
 }
 
 /** 打包：ZIP 项目资料包。sel 可只打包选中的报告与记录范围 */
-export async function exportBundle(input: BundleInput, sel: ExportSelection = {}): Promise<void> {
+export async function exportBundle(input: BundleInput, sel: ExportSelection = {}): Promise<SaveResult> {
   const { project, sources } = input;
   const reports = selectReports(input.reports, sel);
   const records = selectRecords(input.records, sel);
@@ -137,7 +136,7 @@ export async function exportBundle(input: BundleInput, sel: ExportSelection = {}
   root.file('README.txt', renderReadme(project, reports.length, records.length, sources.length));
 
   const out = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  downloadBlob(out, `${base}_项目资料包.zip`);
+  return saveFile(out, `${base}_项目资料包.zip`);
 }
 
 function renderSourceMarkdown(sources: Source[]): string {

@@ -20,6 +20,7 @@ import {
   type StudyRecord,
 } from '../core/types';
 import { blankSections, templateFor } from '../reports/templates';
+import { recorderOf } from '../core/record-content';
 
 /** 四大报告状态摘要（含派生出来的「研究记录」） */
 export interface ReportStatusItem {
@@ -60,7 +61,7 @@ function plain<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
 
-function emptyRecord(projectId: string, index: number, term: 1 | 2): StudyRecord {
+function emptyRecord(projectId: string, index: number, term: 1 | 2, recorder = ''): StudyRecord {
   return {
     id: uid('rec'),
     projectId,
@@ -72,7 +73,7 @@ function emptyRecord(projectId: string, index: number, term: 1 | 2): StudyRecord
     endDate: '',
     place: '',
     participants: [],
-    recorder: '',
+    recorder,
     recordedAt: todayISO(),
     goal: '',
     work: '',
@@ -251,7 +252,7 @@ export const useProjectStore = defineStore('projects', () => {
     // 15 篇研究记录，按学期拆分
     const recs: StudyRecord[] = [];
     for (let i = 1; i <= plan.total; i++) {
-      recs.push(emptyRecord(project.id, i, i <= plan.firstTerm ? 1 : 2));
+      recs.push(emptyRecord(project.id, i, i <= plan.firstTerm ? 1 : 2, recorderOf(project)));
     }
     await db.records.bulkAdd(plain(recs));
 
@@ -336,7 +337,7 @@ export const useProjectStore = defineStore('projects', () => {
 
     const kept: StudyRecord[] = [];
     for (let i = 0; i < total; i++) {
-      const term: 1 | 2 = i < firstTerm ? 1 : 2;
+      const term: 1 | 2 = i + 1 <= firstTerm ? 1 : 2;
       const rec = keep[i];
       if (rec) {
         rec.index = i + 1;
@@ -344,7 +345,7 @@ export const useProjectStore = defineStore('projects', () => {
         await db.records.put(JSON.parse(JSON.stringify(rec)));
         kept.push(rec);
       } else {
-        const fresh = emptyRecord(current.value!.id, i + 1, term);
+        const fresh = emptyRecord(current.value!.id, i + 1, term, recorderOf(current.value!));
         await db.records.add(fresh);
         kept.push(fresh);
       }

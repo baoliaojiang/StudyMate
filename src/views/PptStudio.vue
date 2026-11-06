@@ -156,16 +156,24 @@ async function doExport() {
     if (!ok) return;
   }
   await persist();
-  await app.withBusy('正在生成演示文稿…', async () => {
-    await exportDeckPptx(deck.value!, facts.value.project, facts.value.datasets);
-  });
-  app.toast('PPTX 已导出，模拟内容页保留了标识', 'ok');
+  const res = await app.withBusy('正在生成演示文稿…', async () =>
+    exportDeckPptx(deck.value!, facts.value.project, facts.value.datasets),
+  );
+  if (!res) return;
+  app.toast(
+    res.how === 'cancelled' ? '没有保存' : `${res.note}；模拟内容页保留了标识`,
+    res.how === 'cancelled' ? 'info' : 'ok',
+  );
 }
 
-function doNotes() {
+async function doNotes() {
   if (!deck.value) return;
-  exportDeckNotes(deck.value, facts.value);
-  app.toast('讲稿已导出，口播词可以自己再改', 'ok');
+  try {
+    const res = await exportDeckNotes(deck.value, facts.value);
+    app.toast(res.how === 'cancelled' ? '没有保存' : `${res.note}；口播词可以自己再改`, res.how === 'cancelled' ? 'info' : 'ok');
+  } catch (e) {
+    app.toast(e instanceof Error ? e.message : '讲稿导出失败', 'error', 5000);
+  }
 }
 
 function toggle(id: string) {

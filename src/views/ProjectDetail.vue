@@ -9,8 +9,11 @@ import SourcePanel from '../components/SourcePanel.vue';
 import MemberPanel from '../components/MemberPanel.vue';
 import ProjectSettings from '../components/ProjectSettings.vue';
 import MarkdownText from '../components/MarkdownText.vue';
+import DocxPreview from '../components/DocxPreview.vue';
 import { exportBundle, exportOne, type ExportSelection } from '../export/bundle';
+import { buildRecordsDocx } from '../docx/builder';
 import { countChecks, preflight, type DeliveryCheck } from '../export/preflight';
+import { cleanProjectTexts, hasAiMarks, AI_CLEAN_WARNING } from '../core/ai-clean';
 import { MODE_ENTRY } from '../agents/definitions';
 import { currentReportKind } from '../workflow/graph';
 import WorkflowPanel from '../components/workflow/WorkflowPanel.vue';
@@ -124,6 +127,18 @@ onMounted(async () => {
     router.replace('/');
   }
 });
+
+/**
+ * 同一个项目页内只改 query 时组件不会重建，光在 onMounted 读一次 tab 会失效：
+ * 从别处跳到 ?tab=midterm 还停在原来那页。这里跟上 query 变化。
+ */
+watch(
+  () => route.query.tab,
+  (q) => {
+    const key = String(q ?? '');
+    if (key && tabs.some((t) => t.key === key)) tab.value = key as Tab;
+  },
+);
 
 const p = computed(() => store.current);
 
@@ -243,11 +258,16 @@ async function doExport(kind: 'proposal' | 'progress' | 'midterm' | 'final' | 'm
     checkOpen.value = true;
     return;
   }
-  await app.withBusy('正在生成文档…', async () => {
+  const res = await app.withBusy('正在生成文档…', async () => {
     const input = buildInput();
-    if (kind === 'zip') await exportBundle(input, zipSelection());
-    else await exportOne(kind as any, input);
+    return kind === 'zip' ? await exportBundle(input, zipSelection()) : await exportOne(kind as any, input);
   });
+  if (!res) return; // withBusy 已经 toast 过错误
+  if (res.how === 'cancelled') {
+    app.toast('没有保存', 'info', 2600);
+    return;
+  }
+  app.toast(res.note || '已保存', 'ok', 3600);
 }
 
 function zipSelection(): ExportSelection {
@@ -259,6 +279,66 @@ function zipSelection(): ExportSelection {
     records: zipTerm.value ? { term: zipTerm.value as 1 | 2 } : undefined,
     includeMarkdown: zipIncludeMd.value,
   };
+}
+
+/* ---------------------- 研究记录 DOCX 预览 ---------------------- */
+
+const previewOpen = ref(false);
+const previewBlob = ref<Blob | null>(null);
+const previewLoading = ref(false);
+
+async function previewRecords() {
+  if (!store.records.length) {
+    app.toast('还没有研究记录可预览', 'info');
+    previewOpen.value = false;
+    return;
+  }
+  previewBlob.value = null;
+  previewOpen.value = true;
+  previewLoading.value = true;
+  try {
+    previewBlob.value = await buildRecordsDocx(p.value!, store.records, store.sources);
+  } catch (e) {
+    app.toast(e instanceof Error ? e.message : '预览生成失败', 'error', 5000);
+    previewOpen.value = false;
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
+/* ---------------------- 一键清理全文 AI 标注 ---------------------- */
+
+async function cleanAllAiMarks() {
+  const hasAny =
+    store.reports.some((r) => r.sections.some((s) => hasAiMarks(s.body))) ||
+    store.records.some((rec) =>
+      [rec.goal, rec.work, rec.materials, rec.outputs, rec.summary, rec.nextPlan].some((t) =>
+        hasAiMarks(t),
+      ),
+    );
+  if (!hasAny) {
+    app.toast('当前项目里没有可清理的 AI 标注', 'info');
+    return;
+  }
+  const ok = await askConfirm({
+    title: '清理全文 AI 生成标注',
+    message: AI_CLEAN_WARNING,
+    confirmText: '仍然清理',
+    cancelText: '先不清理',
+    tone: 'warn',
+  });
+  if (!ok) return;
+  const out = cleanProjectTexts(store.reports, store.records);
+  const done = await app.withBusy('正在清理…', async () => {
+    for (const r of out.reports) await store.saveReport(r);
+    for (const r of out.records) await store.saveRecord(r);
+    // saveReport/saveRecord 会就地替换数组元素；再整体赋值一次，确保引用同步为清理后的对象
+    store.reports = out.reports;
+    store.records = out.records;
+    return true;
+  });
+  if (!done) return;
+  app.toast(`已清理 ${out.removed} 处标注（${out.touched} 份材料），删除后无法撤销`, 'ok', 5000);
 }
 
 const recordPlanText = computed(() =>
@@ -316,7 +396,7 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
         </button>
       </div>
       <span class="tabs-count">
-        <b class="tnum">{{ doneCount }}</b>/4 已确认
+        <b class="tnum">{{ doneCount }}</b>/{{ store.reportStatuses.length }} 已确认
       </span>
     </nav>
 
@@ -388,23 +468,25 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
       <div class="card card-pad" style="margin-top: 12px">
         <div class="card-label">交付与导出</div>
         <div class="exp-grid">
-          <button class="exp" @click="doExport('proposal')">
+          <button class="exp" type="button" @click="doExport('proposal')">
             <b>开题报告</b><span>DOCX · 表格版式</span>
           </button>
-          <button class="exp" @click="doExport('progress')">
+          <button class="exp" type="button" @click="doExport('progress')">
             <b>过程记录（上 {{ termStat(1).total }} + 下 {{ termStat(2).total }} 篇）</b><span>DOCX · 阶段性记录表</span>
           </button>
-          <button class="exp" @click="doExport('midterm')">
+          <button class="exp" type="button" @click="doExport('midterm')">
             <b>中期报告</b><span>DOCX · 表格版式</span>
           </button>
-          <button class="exp" @click="doExport('final')">
+          <button class="exp" type="button" @click="doExport('final')">
             <b>结题报告</b><span>DOCX · 可选封面与目录</span>
           </button>
         </div>
         <div class="row wrap" style="margin-top: 12px">
           <button class="btn btn-sm" type="button" @click="router.push(`/deck/${p.id}`)">答辩 PPT（可选）</button>
           <button class="btn btn-sm" type="button" @click="zipOpen = !zipOpen">打包下载（可选范围）</button>
-          <button class="btn btn-sm" @click="doExport('md')">导出 Markdown</button>
+          <button class="btn btn-sm" type="button" @click="doExport('md')">导出 Markdown</button>
+          <button class="btn btn-sm" type="button" @click="previewRecords">预览研究记录</button>
+          <button class="btn btn-sm" type="button" @click="cleanAllAiMarks">清理 AI 标注</button>
           <button class="btn btn-sm" type="button" @click="runCheck">
             导出前核对<template v-if="checks.length">（{{ checkStats.block }} 必处理 / {{ checkStats.warn }} 提醒）</template>
           </button>
@@ -481,6 +563,14 @@ const hasSim = computed(() => (p.value?.modes ?? []).includes('simulated'));
         </div>
       </div>
     </Transition>
+
+    <DocxPreview
+      :open="previewOpen"
+      :blob="previewBlob"
+      :loading="previewLoading"
+      title="研究记录 · DOCX 预览"
+      @close="previewOpen = false"
+    />
 
   </div>
 </template>

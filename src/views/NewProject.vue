@@ -16,10 +16,16 @@ import {
 import { SCHOOL_TOPICS, TOPIC_SUBJECTS } from '../reports/topics';
 import { chatWithBudgetConfirm } from '../ai/budget';
 import MarkdownText from '../components/MarkdownText.vue';
+import AiProgress from '../components/AiProgress.vue';
+import { useAiProgress } from '../core/ai-progress';
 
 const app = useAppStore();
 const store = useProjectStore();
 const router = useRouter();
+
+/** 主表单里的 AI（写要求草案 / 分析要求）与想法弹层里的 AI 分开计时，互不打断 */
+const mainProgress = useAiProgress();
+const ideaProgress = useAiProgress();
 
 /* 学校备选选题：从下发的清单里挑，也可以自己写 */
 const topicPickerOpen = ref(false);
@@ -50,6 +56,7 @@ async function draftRequirement() {
     return;
   }
   drafting.value = true;
+  mainProgress.start('draft', 'AI 正在起草要求草案');
   try {
     const res = await chatWithBudgetConfirm(app.gateway, {
       messages: [
@@ -70,10 +77,15 @@ async function draftRequirement() {
       maxTokens: 900,
       cacheKey: 'requirement-draft',
     });
+    mainProgress.to('verify', '检查有没有编造学校与数据');
     form.requirementText = res.text.trim();
+    mainProgress.to('write');
+    mainProgress.finish('草案已填进教师要求框，请对照老师原文改完再用');
     app.toast('已生成草案：请对照老师的实际要求修改后再创建', 'info', 4600);
   } catch (e) {
-    app.toast(e instanceof Error ? e.message : String(e), 'error', 5000);
+    const msg = e instanceof Error ? e.message : String(e);
+    mainProgress.fail(msg);
+    app.toast(msg, 'error', 5000);
   } finally {
     drafting.value = false;
   }
@@ -138,6 +150,7 @@ async function suggestIdeas() {
   if (ideaBusy.value) return;
   ideaBusy.value = true;
   ideaErr.value = '';
+  ideaProgress.start('idea', 'AI 正在帮你想选题');
   try {
     const res = await chatWithBudgetConfirm(app.gateway, {
       messages: [
@@ -164,14 +177,20 @@ async function suggestIdeas() {
       maxTokens: 700,
       cacheKey: 'topic-ideas',
     });
+    ideaProgress.to('verify', '筛掉空话与编造内容');
     const list = parseIdeas(res.text);
     if (!list.length) {
       ideaErr.value = '这次没想出来，换个说法再试一次。';
+      ideaProgress.fail('模型这次没给出可用题目，换个说法再试一次');
       return;
     }
     ideaList.value = list;
+    ideaProgress.to('write');
+    ideaProgress.finish(`列出 ${list.length} 个方向，选中前请对照老师要求`);
   } catch (e) {
-    ideaErr.value = e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    ideaErr.value = msg;
+    ideaProgress.fail(msg);
   } finally {
     ideaBusy.value = false;
   }
@@ -319,9 +338,11 @@ async function analyze() {
     return;
   }
   analyzing.value = true;
+  mainProgress.start('extract', 'AI 正在解析教师要求');
   const rule = analyzeRequirement(form.requirementText);
   let merged = { fields: rule.fields, warnings: rule.warnings };
   aiUsed.value = false;
+  let degraded = '';
 
   try {
     const res = await chatWithBudgetConfirm(app.gateway, {
@@ -336,21 +357,26 @@ async function analyze() {
       cacheKey: 'requirement-extract',
     });
     const parsed = parseAiExtraction(res.text);
+    mainProgress.to('verify', '把模型结果与规则结果合并');
     if (parsed) {
       merged = mergeAnalysis(rule, parsed);
       aiUsed.value = true;
     } else {
       merged.warnings.push('模型返回的格式无法解析，已只保留规则解析结果。');
+      degraded = '模型返回格式不对，已保留离线规则解析结果';
     }
   } catch (e) {
-    merged.warnings.push(
-      `AI 精修未执行（${e instanceof Error ? e.message : String(e)}），以下为离线规则解析结果。`,
-    );
+    degraded = `模型没接上（${e instanceof Error ? e.message : String(e)}），已保留离线规则解析结果`;
+    merged.warnings.push(`${degraded}。`);
   }
 
   extracted.value = merged.fields;
   extractWarnings.value = merged.warnings;
   applied.value = Object.fromEntries(merged.fields.map((f) => [f.key, true]));
+  mainProgress.to('write');
+  mainProgress.finish(
+    degraded || `识别到 ${merged.fields.length} 项，请逐项核对后再应用`,
+  );
   analyzing.value = false;
   app.toast(
     `识别到 ${merged.fields.length} 项，请逐项核对后再应用`,
@@ -498,6 +524,7 @@ async function create() {
 
     <!-- 步骤 1 -->
     <section v-if="step === 0" class="pane">
+      <AiProgress :progress="mainProgress" compact />
       <label class="field">
         <span class="field-label">研究主题 <span class="req">*</span></span>
         <div class="topic-row">
@@ -861,6 +888,7 @@ async function create() {
             </div>
 
             <div class="idea-body">
+              <AiProgress :progress="ideaProgress" compact />
               <textarea
                 v-model="ideaText"
                 class="textarea"
@@ -919,7 +947,6 @@ async function create() {
                 </button>
               </div>
 
-              <p v-if="ideaBusy && !ideaList.length" class="muted small idea-wait">正在按你的想法组题…</p>
             </div>
           </div>
         </div>
@@ -1133,7 +1160,6 @@ async function create() {
   font-size: calc(10.5px * var(--font-scale)); font-variant-numeric: tabular-nums;
 }
 .idea-why { display: block; margin-top: 4px; font-size: calc(11.5px * var(--font-scale)); color: var(--text-3); line-height: 1.7; }
-.idea-wait { padding: 14px 2px; }
 
 @media (max-width: 560px) {
   .picker { max-height: 92%; }
