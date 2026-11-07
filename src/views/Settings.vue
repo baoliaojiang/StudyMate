@@ -647,7 +647,7 @@ async function setBudget(key: 'dailyCalls' | 'dailyCost', e: Event) {
           <div class="inline">
             <div class="inline-label">
               起草前先检索
-              <span class="inline-hint">写报告前按课题名查一次文献，结果只当线索并标「待核实」，不会自动进来源表</span>
+              <span class="inline-hint">写报告前把课题名发给公开学术检索服务（OpenAlex、Crossref 等）查一次文献，结果只当线索并标「待核实」，不会自动进来源表</span>
             </div>
             <label class="switch">
               <input
