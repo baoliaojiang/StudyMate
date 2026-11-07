@@ -70,8 +70,11 @@ describe('报告事实底座按报告类型取记录', () => {
     expect(text).toContain('本报告可用 3 篇');
   });
 
-  it('开题报告写明不要把未开展写成已完成', () => {
-    expect(contextText(ctx, 'proposal')).toContain('不要把尚未开展的事写成已经完成');
+  it('开题报告写明是计划书，既不把计划写成已完成，也不通篇写尚未开展', () => {
+    const text = contextText(ctx, 'proposal');
+    expect(text).toContain('开题报告写的是研究计划');
+    expect(text).toContain('不要把计划写成已完成');
+    expect(text).toContain('也不要通篇写「尚未开展」');
   });
 
   it('不传 kind 时保持全量，兼容旧调用方', () => {

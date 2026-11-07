@@ -38,6 +38,7 @@ const PRESETS: Record<AiPreset, StepDef[]> = {
   report: [
     { key: 'collect', label: '读取项目资料' },
     { key: 'history', label: '汇总研究记录与来源' },
+    { key: 'search', label: '检索相关文献' },
     { key: 'scope', label: '确定本节写作范围' },
     { key: 'model', label: '调用模型起草本节' },
     { key: 'verify', label: '校验正文与事实边界' },

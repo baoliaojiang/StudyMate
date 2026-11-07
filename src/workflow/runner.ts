@@ -41,7 +41,8 @@ import {
   termName,
   type DraftRecord,
 } from './record-draft';
-import { planOf, recorderOf } from '../core/record-content';
+import { planOf, recorderOf, termOf } from '../core/record-content';
+import { recordFilled } from '../reports/progress';
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -580,8 +581,14 @@ export const useWorkflowStore = defineStore('workflow', () => {
         return;
       }
       const term = sdef.term;
-      const scope = term ? projects.records.filter((x) => x.term === term) : projects.records;
+      const plan = planOf(projects.current!);
+      // 学期一律按序号推导，和报告门禁、报告上下文同一套口径
+      const scope = term
+        ? projects.records.filter((x) => termOf(x.index, plan) === term)
+        : projects.records;
       const real = scope.filter((x) => x.confirmed && x.sourceType === 'real');
+      const filledInTerm = scope.filter((x) => recordFilled(x)).length;
+      const need = term === 1 ? plan.firstTerm : term === 2 ? plan.secondTerm : plan.total;
       const termName = term === 1 ? '上学期' : term === 2 ? '下学期' : '';
       if (!real.length) {
         const drafted = scope.filter((x) => x.activityName.trim() || x.work.trim()).length;
@@ -592,11 +599,18 @@ export const useWorkflowStore = defineStore('workflow', () => {
         step.endedAt = Date.now();
         return;
       }
+      // 中期/结题写的是整学期，不能只写一两篇就往下走
+      if (filledInTerm < need || real.length < need) {
+        step.status = 'failed';
+        step.error = `${termName}计划 ${need} 篇，现在写完 ${filledInTerm} 篇、确认真实 ${real.length} 篇。下一步的中期/结题报告要按整学期汇总，先把${termName}剩下的记录补齐并确认真实。`;
+        step.endedAt = Date.now();
+        return;
+      }
       step.status = 'done';
-      step.output = `${termName}已确认的真实记录 ${real.length} 篇：${real
+      step.output = `${termName}计划 ${need} 篇，已全部写完并确认真实：${real
         .slice(0, 6)
         .map((x) => x.activityName || `第 ${x.index} 篇`)
-        .join('、')}`;
+        .join('、')}${real.length > 6 ? ` 等 ${real.length} 篇` : ''}`;
       step.endedAt = Date.now();
       return;
     }
@@ -924,8 +938,11 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const gaps = gapsFor(kind, { project: p, records: projects.records, sources: projects.sources, datasets: projects.datasets }, app.settings.gapMode);
     const blocking = gaps.filter((g) => g.level === 'block');
     if (isWriter && blocking.length) {
+      const gated = blocking.filter((g) => g.gate);
       step.status = 'failed';
-      step.error = `还不能写：${blocking.map((g) => g.text).join('；')}`;
+      step.error = gated.length
+        ? `${blocking.map((g) => g.text).join('；')}工作流不会拿没写完的记录自动编报告，先去补记录；确实要先写，请到报告页手动起草。`
+        : `还不能写：${blocking.map((g) => g.text).join('；')}`;
       return;
     }
 

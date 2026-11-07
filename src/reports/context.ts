@@ -18,6 +18,7 @@ import type {
 } from '../core/types';
 import { SOURCE_TYPE_LABEL } from '../core/types';
 import { planOf, recorderOf, recordsForReport, reportScopeText } from '../core/record-content';
+import { projectProgress, progressText, reportGate } from './progress';
 
 export interface ReportContext {
   project: Project;
@@ -32,13 +33,20 @@ export interface Gap {
   text: string;
   /** 去哪补 */
   where: string;
+  /**
+   * true 表示这条来自「项目进度门禁」（记录没写完就想写中期/结题）。
+   * 这类阻断要给用户留一个「按现有记录先写」的出口——
+   * 否则某篇记录写得短，结题报告就永远出不来。
+   */
+  gate?: boolean;
 }
 
 export const NO_FABRICATION_RULE = [
   '硬性规则（不可违背）：',
   '- 只使用用户提供的项目信息、研究记录、来源与数据集里出现的事实。',
   '- 缺少必要信息时，不要猜测、不要编造数字、访谈、实验结果或文献；在该处写「待补充：<缺什么>」，并在正文末尾用一行列出需要用户补充的条目。',
-  '- 不得把计划中的活动写成已完成；未开展就写「尚未开展」。',
+  '- 不得把计划中的活动写成已完成；本项目还没发生的活动不要写进正文，更不要写成「已完成」。',
+  '- 正文里不要出现「尚未开展」「尚未开始」「暂无数据」这类自我交代的句子：缺就写「待补充：<缺什么>」。',
   '- 不得虚构引用。没有来源就不写参考文献，不能拼凑作者与年份。',
   '- 报告结构沿用学校下发的表格，不得改动章节名称与顺序。',
 ].join('\n');
@@ -50,6 +58,22 @@ export const NO_FABRICATION_RULE = [
  *   具体数据、人名、日期、访谈原话仍然只能留横线，结尾必须带免责声明。
  */
 export type GapMode = 'strict' | 'fill';
+
+/**
+ * 计划型文档的写作规则（开题报告专用）
+ *
+ * 开题报告本来就是计划书。以前套用「未开展就写尚未开展」那条通用规则，
+ * 生成出来满篇「尚未开展」，等于交了一份空表。这里单独定一套：
+ * 写将来要做什么，用计划语气，既不假装已完成，也不自曝「还没做」。
+ */
+export const PLAN_REPORT_RULE = [
+  '计划型文档规则（本节属于开题报告，是计划书，不是工作总结）：',
+  '- 尚未发生的事用「计划 / 拟 / 将 / 预计」写，写成可执行的安排：什么时间、谁负责、做什么、产出什么。',
+  '- 禁止出现「尚未开展」「尚未开始」「暂无成果」「尚无数据」「待补充」这类字样。开题阶段本来就没有成果，不必交代。',
+  '- 也不得把计划写成已完成：不能写「已完成问卷调查」，要写「拟于 ____ 月发放问卷，计划回收 ____ 份」。',
+  '- 活动与阶段只能来自项目里的阶段计划、研究记录篇目和成员分工，不得凭空增加活动或负责人。',
+  '- 需要数字时写计划目标并留出空位，例如「计划回收 ______ 份有效问卷」，不得给出像实测结果的数值。',
+].join('\n');
 
 export const FILL_DISCLAIMER =
   '免责声明：本节含 AI 补写内容。标注「需核实」的表述为推断，横线处为缺失的真实数据，须由课题组核对后替换，不得直接提交。';
@@ -114,6 +138,9 @@ export function contextText(ctx: ReportContext, kind?: ReportKind): string {
   if (project.requirementText) {
     lines.push(`【教师要求原文】\n${project.requirementText.slice(0, 1200)}`);
   }
+
+  const progress = projectProgress(project, records);
+  lines.push('', progressText(progress));
 
   const scope = kind ? reportScopeText(kind, plan, scoped.length) : '';
   if (scope) lines.push('', scope);
@@ -181,19 +208,30 @@ export function gapsFor(kind: ReportKind, ctx: ReportContext, mode: GapMode = 's
     return gaps;
   }
 
+  /* 进度门禁：记录没写完就不许生成中期/结题，这条不受「写满模式」影响 */
+  const gate = reportGate(kind, projectProgress(project, ctx.records), project.pureAi === true);
+  if (gate.level === 'block') {
+    gaps.push({ level: 'block', text: gate.text, where: gate.where, gate: true });
+  } else if (gate.level === 'warn') {
+    gaps.push({ level: 'warn', text: gate.text, where: gate.where, gate: true });
+  }
+
   /* 记录类缺口在补全模式下降级为提醒：用户已经接受「先写满、后核对」 */
+  const soft = fill || project.pureAi === true;
   if (!records.length) {
     gaps.push({
-      level: fill ? 'warn' : 'block',
+      level: soft ? 'warn' : 'block',
       text: fill
         ? '没有任何研究记录，过程与结果只能按研究设计推断，全部需核实'
-        : '没有任何研究记录，过程/中期/结题都无法基于事实生成',
+        : project.pureAi
+          ? '纯 AI 项目没有真实记录，报告按研究设计推断，导出时会标「AI 模拟示例」'
+          : '没有任何研究记录，过程/中期/结题都无法基于事实生成',
       where: '项目 → 研究记录',
     });
   }
   if (records.length && !confirmed.length) {
     gaps.push({
-      level: fill ? 'warn' : 'block',
+      level: soft ? 'warn' : 'block',
       text: fill
         ? '研究记录都还没确认真实性，报告里的过程描述需逐条核对'
         : '研究记录都还没确认真实性，不能当作已完成的证据',
@@ -231,6 +269,7 @@ export function sectionPrompt(args: {
 }): string {
   const mode = args.mode ?? 'strict';
   const fill = mode === 'fill';
+  const isPlan = args.kind === 'proposal';
   const gapLines = args.gaps.length
     ? args.gaps.map((g) => `- ${g.text}（补充位置：${g.where}）`).join('\n')
     : fill
@@ -248,13 +287,15 @@ export function sectionPrompt(args: {
     fill ? '【缺失的信息（可据此推断，但必须标注）】' : '【当前缺少的信息】',
     gapLines,
     '',
-    fill ? FILL_MODE_RULE : NO_FABRICATION_RULE,
+    isPlan ? PLAN_REPORT_RULE : fill ? FILL_MODE_RULE : NO_FABRICATION_RULE,
     '',
     '【输出纪律】',
     '- 第一句就是这一节的正文内容，不要任何开场白。',
     '- 不要评论「原来的草稿」，不要说明你打算怎么写，不要写「需要换成」「这一点要等老师」这类计划句。',
     '- 不要出现「用户」「学生」「我先」「接下来」这类旁观或自述视角；正文是交上去的成品文字。',
-    '- 信息不够就直接写「尚未开展」或留「待补充」，不要把「还缺什么」写进正文。',
+    isPlan
+      ? '- 信息不够时按计划补全安排（时间、任务、负责人、预期产出），不要写「尚未开展」，也不要整段写「待补充」。'
+      : '- 信息不够就写「待补充：<缺什么>」，不要整段交代「尚未开展」，也不要把「还缺什么」写进正文。',
     '',
     '只输出正文（Markdown），不要重复章节标题。',
     args.existing?.trim() ? `\n【已有草稿】可在其基础上改写，保留其中的真实数据：\n"""\n${args.existing}\n"""` : '',

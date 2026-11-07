@@ -12,6 +12,8 @@ import type { Report, ReportSection, ReportStatus } from '../core/types';
 import { REPORT_STATUS_LABEL, REPORT_STATUS_ORDER, SOURCE_TYPE_LABEL } from '../core/types';
 import { templateFor, NON_AI_SECTIONS } from '../reports/templates';
 import { FILL_DISCLAIMER, contextText, gapsFor, sectionPrompt } from '../reports/context';
+import { projectProgress, progressSummary } from '../reports/progress';
+import { prefetchReferences } from '../reports/prefetch';
 import { detectHeadings, type DetectedHeading } from '../reports/importTemplate';
 import { buildReportDocx, reportToMarkdown } from '../docx/builder';
 import { printReport } from '../export/pdf';
@@ -92,7 +94,68 @@ const ctx = computed(() => ({
 const gaps = computed(() =>
   store.current ? gapsFor(draft.value.kind, ctx.value, app.settings.gapMode) : [],
 );
-const blocking = computed(() => gaps.value.filter((g) => g.level === 'block'));
+/** 硬阻断：成员为空这类，没有讨论余地 */
+const blocking = computed(() => gaps.value.filter((g) => g.level === 'block' && !g.gate));
+/** 进度门禁：记录没写完就想写中期/结题，可以让用户确认后按现有记录先写 */
+const gateBlock = computed(() => gaps.value.filter((g) => g.level === 'block' && g.gate));
+
+/** 项目整体进度，侧栏常显，让用户知道现在写到哪一步 */
+const prog = computed(() =>
+  store.current ? projectProgress(store.current, store.records) : null,
+);
+const progPct = computed(() => {
+  const p = prog.value;
+  if (!p || !p.total) return 0;
+  return Math.round((Math.min(p.filled, p.total) / p.total) * 100);
+});
+
+/**
+ * 起草前先检索一次。
+ *
+ * 只在「项目来源还很少」时做，且同一课题、同一次打开只搜一遍：
+ * 检索是补线索，不是每节都重新联网。结果只进提示词当参考，
+ * 不写进来源表——来源得由用户自己确认。
+ */
+const prefetchCache = ref<{ topic: string; text: string } | null>(null);
+
+function needPrefetch(): boolean {
+  if (!app.settings.prefetchBeforeWrite) return false;
+  if (store.sources.length >= 3) return false;
+  return Boolean(store.current?.topic?.trim());
+}
+
+async function maybePrefetch(): Promise<string> {
+  if (!needPrefetch()) return '';
+  const topic = store.current!.topic.trim();
+  if (prefetchCache.value?.topic === topic) return prefetchCache.value.text;
+  progress.to('search', '按课题名找相关文献');
+  const out = await prefetchReferences(topic, app.settings.searchProviders);
+  prefetchCache.value = { topic, text: out.text };
+  if (out.count) app.toast(out.message, 'info', 3200);
+  return out.text;
+}
+
+async function togglePrefetch(e: Event) {
+  const on = (e.target as HTMLInputElement).checked;
+  await app.saveSettings({ prefetchBeforeWrite: on });
+  app.toast(on ? '起草前会按课题名检索一次文献' : '已关闭起草前检索', 'info', 2200);
+}
+
+/**
+ * 进度门禁的确认出口。
+ * 默认劝用户先去补记录；确实赶时间时允许「按现有记录先写」，
+ * 生成时提示词里会写明只据实有记录写、不足处留白。
+ */
+async function passGate(): Promise<boolean> {
+  if (!gateBlock.value.length) return true;
+  return askConfirm({
+    title: '记录还没写完',
+    message: `${gateBlock.value.map((g) => g.text).join('\n\n')}\n\n建议先去补齐研究记录，报告才站得住。\n如果确实要先写，AI 只会按已有的几篇写，缺的部分留「待补充」。`,
+    confirmText: '按现有记录先写',
+    cancelText: '先去补记录',
+    tone: 'warn',
+  });
+}
 
 /** 本节点名关联的来源：生成时排在事实清单前面，避免引用与段落对不上 */
 const sectionSources = computed(() =>
@@ -156,6 +219,9 @@ async function save() {
   app.toast('已保存', 'ok', 1600);
 }
 
+/** 一键生成时只问一次进度门禁，不要每节弹一遍 */
+let gatePassedInBatch = false;
+
 async function generateSection() {
   const s = section.value;
   if (!s || !spec.value || !store.current) return;
@@ -167,6 +233,7 @@ async function generateSection() {
     app.toast(`还不能生成：${blocking.value[0].text}`, 'warn', 5200);
     return;
   }
+  if (!gatePassedInBatch && !(await passGate())) return;
 
   const sp = spec.value;
   generating.value = s.id;
@@ -184,13 +251,14 @@ async function generateSection() {
       datasets: store.datasets,
       activities: [],
     };
+    const prefetched = await maybePrefetch();
     const base = () =>
       sectionPrompt({
         kind: draft.value.kind,
         heading: s.heading,
         hint: sp.hint,
         words: sp.words,
-        ctxText: ctxTextForSection(),
+        ctxText: [prefetched, ctxTextForSection()].filter(Boolean).join('\n\n'),
         gaps: gaps.value,
         existing: s.body,
         mode: gapMode.value,
@@ -260,19 +328,25 @@ async function generateAll() {
     app.toast(`先补齐：${blocking.value.map((g) => g.text).join('；')}`, 'warn', 6000);
     return;
   }
-  for (const s of draft.value.sections) {
-    if (NON_AI_SECTIONS.includes(s.heading)) continue;
-    if (s.body.trim()) {
-      const ok = await askConfirm({
-        title: '重新生成会覆盖',
-        message: `「${s.heading}」已有内容，重新生成会覆盖。继续？`,
-        confirmText: '仍然继续',
-        tone: 'warn',
-      });
-      if (!ok) continue;
+  if (!(await passGate())) return;
+  gatePassedInBatch = true;
+  try {
+    for (const s of draft.value.sections) {
+      if (NON_AI_SECTIONS.includes(s.heading)) continue;
+      if (s.body.trim()) {
+        const ok = await askConfirm({
+          title: '重新生成会覆盖',
+          message: `「${s.heading}」已有内容，重新生成会覆盖。继续？`,
+          confirmText: '仍然继续',
+          tone: 'warn',
+        });
+        if (!ok) continue;
+      }
+      active.value = s.id;
+      await generateSection();
     }
-    active.value = s.id;
-    await generateSection();
+  } finally {
+    gatePassedInBatch = false;
   }
 }
 
@@ -691,6 +765,18 @@ async function setStatus(next: ReportStatus) {
       <!-- 缺口 -->
       <div class="card card-pad">
         <div class="side-title">写作前检查</div>
+        <div v-if="prog" class="prog">
+          <div class="prog-track"><i :style="{ width: `${progPct}%` }" /></div>
+          <span class="prog-text">{{ progressSummary(prog) }}</span>
+        </div>
+        <label class="pref-row">
+          <input
+            type="checkbox"
+            :checked="app.settings.prefetchBeforeWrite"
+            @change="togglePrefetch"
+          />
+          <span>起草前先检索相关文献</span>
+        </label>
         <ul v-if="gaps.length" class="gaps">
           <li v-for="g in gaps" :key="g.text" :class="g.level">
             <b>{{ g.level === 'block' ? '缺' : '建议补' }}</b>
@@ -943,8 +1029,31 @@ async function setStatus(next: ReportStatus) {
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border-radius: var(--r-2);
 }
+/* 项目进度：一条 3px 的细线，别喧宾夺主 */
+.prog { margin-bottom: 12px; }
+.prog-track {
+  height: 3px; border-radius: var(--r-full); overflow: hidden;
+  background: var(--surface-2);
+}
+.prog-track i {
+  display: block; height: 100%; min-width: 3px;
+  background: var(--brand);
+  transition: width 400ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+.prog-text {
+  display: block; margin-top: 6px;
+  font-size: var(--fs-1); color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
 .gaps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
 .gaps li { display: flex; align-items: flex-start; gap: 7px; font-size: var(--fs-1); line-height: 1.7; }
+/* 起草前检索：一行小勾选，别做成大开关把侧栏撑开 */
+.pref-row {
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 12px; cursor: pointer;
+  font-size: var(--fs-1); color: var(--text-3); line-height: 1.5;
+}
+.pref-row input { flex: 0 0 auto; width: 14px; height: 14px; margin: 0; accent-color: var(--brand); }
 /* 标签不再抢走正文宽度：钉在小胶囊里且不换行，文字列可以正常折行 */
 .gaps b {
   flex: 0 0 auto; white-space: nowrap;

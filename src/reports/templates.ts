@@ -178,7 +178,7 @@ export const PROPOSAL_TEMPLATE: ReportTemplate = {
     {
       heading: '简要背景说明',
       level: 1,
-      hint: '两三百字说清：从什么现象或经历出发、为什么值得研究、目前已知什么。只写真实观察到的情况。',
+      hint: '两三百字说清：从什么现象或经历出发、为什么值得研究、目前已知什么。写已经观察到的情况，可以写「据我们平时观察」，不要编统计数据。',
       words: 300,
       required: true,
       placeholder: '待补充：请写明触发这个选题的具体现象或经历。',
@@ -186,7 +186,7 @@ export const PROPOSAL_TEMPLATE: ReportTemplate = {
     {
       heading: '课题的目的和意义',
       level: 1,
-      hint: '目的 = 想回答什么、达到什么结果；意义 = 对自身、同学、学校或社区的实际用处。',
+      hint: '目的 = 想回答什么问题、做到什么程度；意义 = 对同学、学校或社区的实际用处。用「本研究拟……」「预期能够……」这类计划语气。',
       words: 400,
       required: true,
       placeholder: '待补充：研究目的与实践意义需要你结合自身情况填写。',
@@ -194,7 +194,7 @@ export const PROPOSAL_TEMPLATE: ReportTemplate = {
     {
       heading: '课题活动计划',
       level: 1,
-      hint: '按阶段列时间、任务、负责人、预期产出，与项目里的阶段计划和成员分工一致；不能写没安排的活动。',
+      hint: '写成可执行的安排：分几个阶段、每段什么时间做、谁负责、做出什么、怎么检查。用「计划 / 拟 / 将」的语气写将来要做的事，不要写「尚未开展」，也不要写「已完成」。阶段与分工要和项目里的记录篇数、成员分工对得上。',
       words: 500,
       required: true,
       placeholder: '待补充：请先确定阶段划分与成员分工。',

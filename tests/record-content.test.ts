@@ -204,6 +204,8 @@ describe('报告上下文按范围取记录', () => {
   it('范围说明写明中期只总结上学期、结题覆盖整个研究周期', () => {
     expect(reportScopeText('midterm', DEFAULT_RECORD_PLAN, 8)).toContain('只总结上学期');
     expect(reportScopeText('final', DEFAULT_RECORD_PLAN, 15)).toContain('整个研究周期');
-    expect(reportScopeText('proposal', DEFAULT_RECORD_PLAN, 0)).toContain('不要把尚未开展的事写成已经完成');
+    const proposal = reportScopeText('proposal', DEFAULT_RECORD_PLAN, 0);
+    expect(proposal).toContain('不要把计划写成已完成');
+    expect(proposal).toContain('也不要通篇写「尚未开展」');
   });
 });

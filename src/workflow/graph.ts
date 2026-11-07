@@ -177,7 +177,7 @@ export const DEFAULT_STEPS: WorkflowStepDef[] = [
     phase: 'write',
     term: 1,
     desc: '检查上学期的记录是否真实、是否已确认。没有就不进中期',
-    requires: '上学期至少一篇「真实开展」且已确认的研究记录',
+    requires: '上学期计划内的记录全部写完，并逐篇确认真实开展',
     enabled: true,
   }),
   step({
@@ -227,7 +227,7 @@ export const DEFAULT_STEPS: WorkflowStepDef[] = [
     phase: 'write',
     term: 2,
     desc: '检查下学期的记录是否真实、是否已确认。没有就不进结题',
-    requires: '下学期至少一篇「真实开展」且已确认的研究记录',
+    requires: '下学期计划内的记录全部写完，并逐篇确认真实开展',
     enabled: true,
   }),
   step({

@@ -351,7 +351,8 @@ export function batchHistory(
 export function recordsForReport(kind: string, records: StudyRecord[], plan?: RecordPlan): StudyRecord[] {
   const p = plan ?? DEFAULT_RECORD_PLAN;
   const all = (records ?? []).slice().sort((a, b) => a.index - b.index);
-  if (kind === 'midterm') return all.filter((r) => r.term === 1 || r.index <= p.firstTerm);
+  // 学期按序号推导，和 reports/progress.ts 用同一套口径，避免两边算出不同结果
+  if (kind === 'midterm') return all.filter((r) => termOf(r.index, p) === 1);
   return all;
 }
 
@@ -363,7 +364,7 @@ export function reportScopeText(kind: string, plan: RecordPlan, count: number): 
     return `【本报告范围】结题报告覆盖整个研究周期：上学期与下学期共 ${count} 篇记录都要纳入，按时间顺序写清研究过程、结果、结论与反思。`;
   }
   if (kind === 'proposal') {
-    return '【本报告范围】开题报告写研究计划：背景、目标、方法、分工与预期成果；不要把尚未开展的事写成已经完成。';
+    return '【本报告范围】开题报告写的是研究计划：背景、目标、方法与预期成果。用「计划 / 拟 / 将」的语气写将来要做的事；不要把计划写成已完成，也不要通篇写「尚未开展」——开题阶段本来就还没有成果，不需要交代这一点。';
   }
   return '';
 }

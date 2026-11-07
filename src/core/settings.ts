@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enabledAgents: [],
   safeTopPad: 0,
   gapMode: 'strict',
+  prefetchBeforeWrite: true,
   budget: {
     dailyCalls: 200,
     dailyCost: 5,

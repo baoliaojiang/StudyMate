@@ -615,6 +615,12 @@ export interface AppSettings {
    * fill：尽量写满，推断处标注、数据留横线、末尾附免责声明。
    */
   gapMode: 'strict' | 'fill';
+  /**
+   * AI 起草报告/记录前先联网检索一次。
+   * 只用已启用的公开学术接口（OpenAlex / Crossref / arXiv），结果当「线索」，
+   * 一律标待核实，不自动写进来源表，也不许模型直接当引用。
+   */
+  prefetchBeforeWrite: boolean;
   budget: BudgetConfig;
   /** Agent -> 模型映射；关闭自动分配则为空 */
   /** Agent -> 模型映射；关闭自动分配则为空 */
